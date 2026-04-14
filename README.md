@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="3d512.png" alt="BVCC Banner" width="600"/>
+  <img src="3d512.png" alt="BVCC Banner" width="100"/>
 </p>
 
 <h1 align="center">Better VRChat Creator Companion (BVCC)</h1>

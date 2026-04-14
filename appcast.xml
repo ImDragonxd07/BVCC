@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE rss [
+  <!ENTITY appname "BVCC">
+  <!ENTITY version "0.1.1b">
+  <!ENTITY repo "https://github.com/YourUsername/YourRepo">
+]>
+<rss version="2.0"
+    xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>&appname;</title>
+    <item>
+      <title>&appname; &version;</title>
+
+      <sparkle:version>&version;</sparkle:version>
+      <sparkle:shortVersionString>&version;</sparkle:shortVersionString>
+
+      <sparkle:releaseNotesLink>&repo;/releases/tag/v&version;</sparkle:releaseNotesLink>
+
+      <enclosure
+          url="&repo;/releases/download/v&version;/Setup.exe"
+          sparkle:os="windows"
+          length="0"
+          type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

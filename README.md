@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="banner.png" width="600" />
+  <img src="githubassets/banner.png" width="600" />
 </p>
 
 <p align="center">
@@ -7,10 +7,18 @@
 </p>
 
 ---
-
 BVCC is a custom tool designed to improve quality of life over the standard VRChat Creator Companion.
 
----
+## Screenshots
+
+<p align="center">
+  <img src="githubassets/ss1.png" width="48%" />
+  <img src="githubassets/ss2.png" width="48%" />
+</p>
+
+<p align="center">
+  <img src="githubassets/ss3.png" width="60%" />
+</p>
 
 ## Setup
 

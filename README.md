@@ -1,10 +1,4 @@
-<p align="center">
-  <img src="3d512.png" width="42" align="middle" />
-  <span style="font-size:42px; font-weight:700; margin-left:12px;">
-    BVCC
-  </span>
-</p>
-
+<img src="banner.png" width="200" align="middle" />
 <p align="center" style="font-size:18px;">
   Better VRChat Creator Companion
 </p>

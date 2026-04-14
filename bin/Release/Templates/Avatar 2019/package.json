@@ -1,8 +1,0 @@
-{
-	"name" : "com.vrchat.template.avatar.2019",
-	"displayName" : "VRChat Unity 2019 Avatar Project",
-	"description" : "A good starting point for a new VRChat Avatar",
-	"version" : "1.0.2",
-	"category" : "ProjectTemplate",
-	"dependencies" : {}
-}

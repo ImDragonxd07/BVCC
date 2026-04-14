@@ -1,12 +1,14 @@
-<p align="left">
-  <img src="3d512.png" width="100" />
-</p>
-
-<h1 align="center">BVCC</h1>
-
-<p align="center">
-  Better VRChat Creator Companion
-</p>
+<table>
+  <tr>
+    <td width="110">
+      <img src="3d512.png" width="100" />
+    </td>
+    <td>
+      <h1>BVCC</h1>
+      <p>Better VRChat Creator Companion</p>
+    </td>
+  </tr>
+</table>
 
 <br>
 

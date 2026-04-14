@@ -1,2 +1,4 @@
 bin/Release/Settings.json
 /bin
+setupfilescript.iss
+Output/BVCCSetup.exe

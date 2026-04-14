@@ -16,8 +16,9 @@ namespace BVCC
     {
         public class SaveData
         {
-            public string AppName { get; } = App.AppName;
-            public string AppVersion { get;} = App.Version;
+            public string AppName { get; set; } = "BVCC";
+            public string AppVersion { get; set; } = "0";
+            public bool CheckForUpdates { get; set; } = true;
             public List<RepoItem> Repositories { get; set; } = new List<RepoItem>();
             public List<ProjectItem> Projects { get; set; } = new List<ProjectItem>();
             public List<RepoTemplate> RepoTemplates { get; set; } = new List<RepoTemplate>();

@@ -31,6 +31,7 @@ namespace BVCC
         public event PropertyChangedEventHandler PropertyChanged;
 
         private double _createProgress;
+        private HashSet<string> _selectedPackageIds = new HashSet<string>();
 
         public double CreateProgress
         {
@@ -55,22 +56,28 @@ namespace BVCC
 
         private void RefreshRepoList()
         {
-            var selectedIds = new HashSet<string>(
-                RepoList.SelectedItems
-                    .OfType<ProjectPackage>()
-                    .Select(p => p.ID)
-            );
+            _suppressSelectionChanged = true;
 
             RepoList.ItemsSource = _filteredPackages
-                .OrderByDescending(p => selectedIds.Contains(p.ID)) // selected first
-                .ThenBy(p => p.Name) // alphabetical
+                .OrderByDescending(p => _selectedPackageIds.Contains(p.ID))
+                .ThenBy(p => p.Name)
                 .ToList();
+
+            foreach (var item in RepoList.Items.OfType<ProjectPackage>())
+            {
+                if (_selectedPackageIds.Contains(item.ID))
+                    RepoList.SelectedItems.Add(item);
+            }
+
+            _suppressSelectionChanged = false;
         }
 
         private async Task LoadRepositories()
         {
             _repoCache.Clear();
             _availablePackages.Clear();
+            RepoGhostLoading.Visibility = Visibility.Visible;
+            RepoList.Visibility = Visibility.Collapsed;
 
             foreach (var repo in App.savedata.Repositories)
             {
@@ -115,6 +122,8 @@ namespace BVCC
 
             _availablePackages = list;
             _filteredPackages = list;
+            RepoGhostLoading.Visibility = Visibility.Collapsed;
+            RepoList.Visibility = Visibility.Visible;
 
             RefreshRepoList();
         }
@@ -166,12 +175,12 @@ namespace BVCC
             }
             CreateBtn.Visibility = Visibility.Visible;
         }
-        private void TemplateSelector_SelectionChangedAsync(object sender, SelectionChangedEventArgs e)
+
+        private async void TemplateSelector_SelectionChangedAsync(object sender, SelectionChangedEventArgs e)
         {
             var template = TemplateSelector.SelectedItem as RepoTemplate;
             if (template == null) return;
-            SelectTemplate(template);
-            TemplateSelector.SelectedItem = null;
+            await SelectTemplate(template);
         }
 
         private void CreateButton_Click(object sender, RoutedEventArgs e)
@@ -233,7 +242,12 @@ namespace BVCC
         {
             if (_suppressSelectionChanged) return;
 
-            var count = RepoList.SelectedItems.Count;
+            foreach (ProjectPackage p in e.AddedItems.OfType<ProjectPackage>())
+                _selectedPackageIds.Add(p.ID);
+            foreach (ProjectPackage p in e.RemovedItems.OfType<ProjectPackage>())
+                _selectedPackageIds.Remove(p.ID);
+
+            var count = _selectedPackageIds.Count;
             BulkActionBar.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
             SelectedCountText.Text = $"{count} selected";
             RefreshRepoList();
@@ -241,43 +255,30 @@ namespace BVCC
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
-            RepoList.SelectAll();
+            foreach (var p in _filteredPackages)
+                _selectedPackageIds.Add(p.ID);
             RefreshRepoList();
         }
 
         private void DeselectAll_Click(object sender, RoutedEventArgs e)
         {
-            RepoList.UnselectAll();
+            foreach (var p in _filteredPackages)
+                _selectedPackageIds.Remove(p.ID);
             RefreshRepoList();
         }
         private async Task SelectTemplate(RepoTemplate template)
         {
             if (template == null) return;
 
-            // ⏳ wait for repo list to be ready
             if (_loadTask != null)
                 await _loadTask;
 
-            _suppressSelectionChanged = true;
-
-            RepoList.UnselectAll();
+            _selectedPackageIds = new HashSet<string>(template.PackageIDs);
             TemplateNameBox.Text = template.Name;
-
-            var idSet = new HashSet<string>(template.PackageIDs);
-
-            foreach (var item in RepoList.Items.OfType<ProjectPackage>())
-            {
-                if (idSet.Contains(item.ID))
-                {
-                    RepoList.SelectedItems.Add(item);
-                }
-            }
-
-            _suppressSelectionChanged = false;
 
             RefreshRepoList();
 
-            var count = RepoList.SelectedItems.Count;
+            var count = _selectedPackageIds.Count;
             BulkActionBar.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
             SelectedCountText.Text = $"{count} selected";
         }
@@ -364,7 +365,7 @@ namespace BVCC
 
                 File.WriteAllText(
                     logPath,
-                    $"[{DateTime.Now:o}] START\nApp: {App.AppName}\nVersion: {App.Version}\nProject: {projectName}\nPath: {destination}\n\n"
+                    $"[{DateTime.Now:o}] START\nApp: {App.savedata.AppName}\nVersion: {App.savedata.AppVersion}\nProject: {projectName}\nPath: {destination}\n\n"
                 );
 
                 Log("Initial log created");
@@ -418,7 +419,9 @@ namespace BVCC
 
                 Log("Project loaded into PackageManager");
 
-                var packages = RepoList.SelectedItems.Cast<ProjectPackage>().ToList();
+                var packages = _availablePackages
+                                            .Where(p => _selectedPackageIds.Contains(p.ID))
+                                            .ToList();
 
                 int total = packages.Count;
                 int done = 0;
@@ -498,9 +501,5 @@ namespace BVCC
             );
         }
 
-        private void TemplateSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-
-        }
     }
 }

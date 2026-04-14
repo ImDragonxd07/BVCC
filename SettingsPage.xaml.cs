@@ -20,8 +20,8 @@ namespace BVCC
         {
             InitializeComponent();
             RefreshPage();
-            NameText.Text = App.AppName;
-            VersionText.Text = App.Version;
+            NameText.Text = App.savedata.AppName;
+            VersionText.Text = App.savedata.AppVersion;
         }
 
         private void RefreshPage()

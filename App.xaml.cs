@@ -1,10 +1,19 @@
-﻿using Newtonsoft.Json;
+﻿
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Management.Instrumentation;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Shapes;
+using System.Xml;
+using static BVCC.App;
 using static BVCC.Data;
 using static System.Net.WebRequestMethods;
 using File = System.IO.File;
@@ -20,13 +29,67 @@ namespace BVCC
         public static NewFromTemplate NewFromTemplatePage { get; private set; }
 
         public static SaveData savedata = new SaveData();
-        public static string Version = "0.1.0B";
-        public static string AppName = "BVCC";
         public static bool TemplatesInsalled = false;
+
+        private async Task<XmlDocument> GetDocFromWeb(string url)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+                string xmlContent = await client.GetStringAsync(url).ConfigureAwait(false);
+                XmlReaderSettings settings = new XmlReaderSettings();
+                settings.DtdProcessing = DtdProcessing.Parse;
+                settings.XmlResolver = new XmlUrlResolver();
+
+                XmlDocument doc = new XmlDocument();
+                using (StringReader stringReader = new StringReader(xmlContent))
+                using (XmlReader reader = XmlReader.Create(stringReader, settings))
+                {
+                    doc.Load(reader);
+                }
+                return doc;
+            }
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
-            base.OnStartup(e);
+            OnStartupAsync(e);
+        }
 
+        public async Task<dynamic> GetLastestRelease()
+        {
+            // Use the general releases list (DO NOT use /latest)
+            string url = "https://api.github.com/repos/ImDragonxd07/BVCC/releases";
+
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", "BVCC-Updater");
+
+                try
+                {
+                    string json = await client.GetStringAsync(url);
+                    var serializer = new JavaScriptSerializer();
+
+                    // GitHub returns an array [] of releases
+                    var releases = serializer.Deserialize<dynamic[]>(json);
+
+                    if (releases != null && releases.Length > 0)
+                    {
+                        // The item at [0] is ALWAYS the newest published release
+                        // even if it is a pre-release!
+                        return releases[0];
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("API Error: " + ex.Message);
+                }
+            }
+            return null;
+        }
+        private async Task OnStartupAsync(StartupEventArgs e)
+        {
+            base.OnStartup(e);
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
             var structure = new[]
@@ -99,17 +162,76 @@ namespace BVCC
                     PackageIDs = new System.Collections.Generic.List<string>() { "com.vrchat.core.vpm-resolver", "com.vrchat.base", "com.vrchat.worlds" }
                 });
             }
-            SaveToDisk();
+            SplashScreen splash = new SplashScreen();
+            splash.Show();
+            splash.LoadingStatus.Text = "INIT";
 
+            if (savedata.CheckForUpdates)
+            {
+                splash.LoadingStatus.Text = "Checking for updates...";
+                var latest = await GetLastestRelease();
+                if (latest != null)
+                {
+                    string newestVersion = latest["tag_name"];
+                    string downloadUrl = latest["assets"][0]["browser_download_url"];
+                    string myCurrentVersion = savedata.AppVersion;
+                    if (newestVersion != myCurrentVersion)
+                    {
+                        splash.LoadingStatus.Text = $"Downloading update {newestVersion}...";
+                        string tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BVCCSetup.exe");
+                        using (var client = new System.Net.WebClient())
+                        {
+                            client.DownloadProgressChanged += (s, ev) =>
+                            {
+                                if (splash.LoadingBar.IsIndeterminate)
+                                    splash.LoadingBar.IsIndeterminate = false;
+
+                                splash.LoadingBar.Value = ev.ProgressPercentage;
+                                splash.LoadingStatus.Text = $"Downloading: {ev.ProgressPercentage}%";
+                            };
+
+                            client.DownloadFileCompleted += (s, ev) =>
+                            {
+                                if (ev.Error == null)
+                                {
+                                    splash.LoadingStatus.Text = "Installing & Restarting...";
+                                    savedata.AppVersion = newestVersion;
+                                    SaveToDisk();
+                                    var startInfo = new System.Diagnostics.ProcessStartInfo
+                                    {
+                                        FileName = tempPath,
+                                        Arguments = "/VERYSILENT /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /SUPPRESSMSGBOXES /NORESTART",
+                                        UseShellExecute = true
+                                    };
+                                    System.Diagnostics.Process.Start(startInfo);
+
+                                    System.Windows.Application.Current.Shutdown();
+                                }
+                                else
+                                {
+                                    splash.IsUpdating = false;
+                                }
+                            };
+
+                            client.DownloadFileAsync(new Uri(downloadUrl), tempPath);
+                            return;
+                        }
+                    }
+                }
+                splash.IsUpdating = false;
+            }
+            splash.LoadingStatus.Text = "Launching";
+            SaveToDisk();
+            splash.Hide();
             ProjectsPage = new ProjectsPage();
             SettingsPage = new SettingsPage();
             NewFromTemplatePage = new NewFromTemplate();
-
+            Application.Current.MainWindow = ProjectsPage;
             ProjectsPage.Show();
         }
         public static void SaveToDisk()
         {
-            File.WriteAllText("Settings.json", Newtonsoft.Json.JsonConvert.SerializeObject(savedata, Formatting.Indented));
+            File.WriteAllText("Settings.json", Newtonsoft.Json.JsonConvert.SerializeObject(savedata, Newtonsoft.Json.Formatting.Indented));
         }
         public static void OpenProject(ProjectItem project)
         {

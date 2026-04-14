@@ -27,6 +27,60 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Storyboard x:Key="ShimmerStoryboard">
+            <PointAnimation
+                RepeatBehavior="Forever"
+                Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.StartPoint)"
+                From="-2,0"
+                To="1,0"
+                Duration="0:0:1.5" />
+            <PointAnimation
+                RepeatBehavior="Forever"
+                Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.EndPoint)"
+                From="-1,0"
+                To="2,0"
+                Duration="0:0:1.5" />
+        </Storyboard>
+        <Style x:Key="GhostCard" TargetType="Border">
+            <Setter Property="Background" Value="#FF2A2A2A" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Padding" Value="15,10" />
+            <Setter Property="BorderBrush" Value="#FF333333" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style x:Key="GhostLine" TargetType="ContentControl">
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContentControl">
+                        <Border
+                            Background="#FF333333"
+                            ClipToBounds="True"
+                            CornerRadius="4">
+                            <Border>
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="-1,0" EndPoint="0,0">
+                                        <GradientStop Offset="0" Color="Transparent" />
+                                        <GradientStop Offset="0.5" Color="#1AFFFFFF" />
+                                        <GradientStop Offset="1" Color="Transparent" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <EventTrigger RoutedEvent="Loaded">
+                                                <BeginStoryboard Storyboard="{StaticResource ShimmerStoryboard}" />
+                                            </EventTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="CreateButton" TargetType="Button">
             <Setter Property="Background" Value="#FF0078D4" />
             <Setter Property="Foreground" Value="White" />
@@ -428,7 +482,7 @@
                             Width="140"
                             Margin="0,0,10,0"
                             ItemsSource="{Binding RepoTemplates}"
-                            SelectionChanged="TemplateSelector_SelectionChanged"
+                            SelectionChanged="TemplateSelector_SelectionChangedAsync"
                             Style="{StaticResource VersionComboBox}">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
@@ -553,7 +607,170 @@
                             </StackPanel>
                         </Grid>
                     </Border>
+                    <StackPanel
+                        x:Name="RepoGhostLoading"
+                        Grid.Row="2"
+                        Visibility="Collapsed">
 
+                        <Border
+                            Margin="0,0,0,3"
+                            Padding="10,7"
+                            Style="{StaticResource GhostCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentControl
+                                    Grid.Column="0"
+                                    Width="13"
+                                    Height="13"
+                                    Margin="0,0,10,0"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="1"
+                                    Width="180"
+                                    Height="11"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="2"
+                                    Width="120"
+                                    Height="10"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource GhostLine}" />
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            Margin="0,0,0,3"
+                            Padding="10,7"
+                            Opacity="0.8"
+                            Style="{StaticResource GhostCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentControl
+                                    Grid.Column="0"
+                                    Width="13"
+                                    Height="13"
+                                    Margin="0,0,10,0"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="1"
+                                    Width="140"
+                                    Height="11"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="2"
+                                    Width="90"
+                                    Height="10"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource GhostLine}" />
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            Margin="0,0,0,3"
+                            Padding="10,7"
+                            Opacity="0.6"
+                            Style="{StaticResource GhostCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentControl
+                                    Grid.Column="0"
+                                    Width="13"
+                                    Height="13"
+                                    Margin="0,0,10,0"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="1"
+                                    Width="160"
+                                    Height="11"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="2"
+                                    Width="150"
+                                    Height="10"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource GhostLine}" />
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            Margin="0,0,0,3"
+                            Padding="10,7"
+                            Opacity="0.4"
+                            Style="{StaticResource GhostCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentControl
+                                    Grid.Column="0"
+                                    Width="13"
+                                    Height="13"
+                                    Margin="0,0,10,0"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="1"
+                                    Width="120"
+                                    Height="11"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="2"
+                                    Width="110"
+                                    Height="10"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource GhostLine}" />
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            Margin="0,0,0,3"
+                            Padding="10,7"
+                            Opacity="0.2"
+                            Style="{StaticResource GhostCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentControl
+                                    Grid.Column="0"
+                                    Width="13"
+                                    Height="13"
+                                    Margin="0,0,10,0"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="1"
+                                    Width="150"
+                                    Height="11"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource GhostLine}" />
+                                <ContentControl
+                                    Grid.Column="2"
+                                    Width="80"
+                                    Height="10"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource GhostLine}" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
                     <!--  REPO LIST  -->
                     <ListBox
                         x:Name="RepoList"

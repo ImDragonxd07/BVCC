@@ -1,0 +1,772 @@
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media.Animation;
+using static BVCC.Data;
+using static BVCC.Data.ProjectPackage;
+
+namespace BVCC
+{
+    public partial class PackageManagerPage : UserControl
+    {
+        private ProjectItem currentproject;
+        private List<ProjectPackage> allPackages = new List<ProjectPackage>();
+        private static readonly HttpClient client = new HttpClient();
+        private Dictionary<string, (JObject data, DateTime fetchedAt)> _repoCache = new Dictionary<string, (JObject, DateTime)>();
+        private static readonly TimeSpan CacheExpiry = TimeSpan.FromHours(1);
+        private bool _isBulkOperation = false;
+        private SemaphoreSlim _installLock = new SemaphoreSlim(1, 1);
+
+        private string _activeFilter = "All";
+        private string _activeSortField = "Status";
+        private bool _sortAscending = true;
+
+        private Grid _loadingOverlay;
+
+        public PackageManagerPage()
+        {
+            InitializeComponent();
+            _loadingOverlay = LoadingOverlay;
+            UpdateSortButtonStyles();
+        }
+        public void ClearRepoCache()
+        {
+            _repoCache.Clear();
+        }
+        private static Version ParseVersion(string v)
+        {
+            var clean = v.Split('-')[0];
+            return Version.TryParse(clean, out var parsed) ? parsed : new Version(0, 0);
+        }
+
+        public async Task DownloadFileAsync(string url, string outputPath, Action<float> onProgress = null)
+        {
+            using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+            {
+                response.EnsureSuccessStatusCode();
+                var total = response.Content.Headers.ContentLength;
+                using (var stream = await response.Content.ReadAsStreamAsync())
+                using (var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                {
+                    var buffer = new byte[8192];
+                    long downloaded = 0;
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        await fileStream.WriteAsync(buffer, 0, read);
+                        downloaded += read;
+                        if (total.HasValue && onProgress != null)
+                            onProgress((float)downloaded / total.Value);
+                    }
+                }
+            }
+        }
+
+        private HashSet<string> _installing = new HashSet<string>();
+        private readonly object _installingLock = new object();
+
+        public async Task InstallOrUpdatePackage(ProjectPackage package, string version, bool force = false)
+        {
+            if (package == null) return;
+            if (string.IsNullOrEmpty(version)) return;
+
+            lock (_installingLock)
+            {
+                if (_installing.Contains(package.ID))
+                    return;
+
+                _installing.Add(package.ID);
+            }
+
+            await _installLock.WaitAsync();
+
+            List<(ProjectPackage pkg, string ver)> dependenciesToInstall =
+                new List<(ProjectPackage, string)>();
+
+            try
+            {
+                if (package.CurrentAction == PackageAction.None)
+                    package.CurrentAction = PackageAction.Installing;
+
+                package.ProgressingControl =
+                    package.CurrentAction == PackageAction.Updating ? "Update" :
+                    package.CurrentAction == PackageAction.ChangingVersion ? "Version" :
+                    package.CurrentAction == PackageAction.Removing ? "Remove" :
+                    "Install";
+
+                package.InstallProgress = 0.05;
+
+                string downloadUrl = null;
+
+                foreach (var entry in _repoCache.Values)
+                {
+                    var versionData = entry.data["packages"]?[package.ID]?["versions"]?[version];
+                    if (versionData != null)
+                    {
+                        downloadUrl = versionData["url"]?.ToString();
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(downloadUrl))
+                    throw new Exception($"Missing URL for {package.ID}");
+
+                string cacheFolder = Path.Combine(App.savedata.RepoPath, package.ID, version);
+                string zipPath = Path.Combine(cacheFolder, $"{package.ID}_{version}.zip");
+                string projectPackagePath = Path.Combine(currentproject.ProjectPath, "Packages", package.ID);
+
+                Directory.CreateDirectory(cacheFolder);
+
+                if (!File.Exists(zipPath))
+                {
+                    await DownloadFileAsync(downloadUrl, zipPath, p =>
+                    {
+                        package.InstallProgress = 0.05 + p * 0.6f;
+                    });
+                }
+
+                package.InstallProgress = 0.7;
+
+                await Task.Run(() =>
+                {
+                    if (Directory.Exists(projectPackagePath))
+                        Directory.Delete(projectPackagePath, true);
+
+                    ZipFile.ExtractToDirectory(zipPath, projectPackagePath);
+                });
+
+                package.InstallProgress = 0.85;
+
+                await UpdateManifest(package.ID, version);
+
+                string packageJsonPath = Path.Combine(projectPackagePath, "package.json");
+
+                if (File.Exists(packageJsonPath))
+                {
+                    JObject pkgJson = null;
+
+                    try
+                    {
+                        pkgJson = JObject.Parse(File.ReadAllText(packageJsonPath));
+                    }
+                    catch { }
+
+                    var deps =
+                        pkgJson?["vpmDependencies"] as JObject ??
+                        pkgJson?["dependencies"] as JObject;
+
+                    if (deps != null)
+                    {
+                        foreach (var dep in deps.Properties())
+                        {
+                            var depPackage = allPackages.FirstOrDefault(p => p.ID == dep.Name);
+
+                            if (depPackage == null) continue;
+                            if (depPackage.IsInstalled) continue;
+                            if (string.IsNullOrEmpty(depPackage.LatestVersion)) continue;
+
+                            dependenciesToInstall.Add((depPackage, depPackage.LatestVersion));
+                        }
+                    }
+                }
+
+                package.InstallProgress = 1.0;
+                await Task.Delay(100);
+
+                if (!_isBulkOperation)
+                    await LoadProject(currentproject);
+            }
+            finally
+            {
+                _installLock.Release();
+
+                lock (_installingLock)
+                    _installing.Remove(package.ID);
+
+                package.ProgressingControl = null;
+                package.CurrentAction = PackageAction.None;
+                package.InstallProgress = 0;
+            }
+
+            foreach (var dep in dependenciesToInstall)
+            {
+                await InstallOrUpdatePackage(dep.pkg, dep.ver, force: true);
+            }
+        }
+        private async Task UpdateManifest(string id, string version, bool isRemoval = false)
+        {
+            string manifestPath = Path.Combine(currentproject.ProjectPath, "Packages", "vpm-manifest.json");
+            string packageJsonPath = Path.Combine(currentproject.ProjectPath, "Packages", id, "package.json");
+
+            if (!File.Exists(manifestPath))
+                return;
+
+            var manifestJson = JObject.Parse(File.ReadAllText(manifestPath));
+
+            if (manifestJson["dependencies"] == null)
+                manifestJson["dependencies"] = new JObject();
+
+            if (manifestJson["locked"] == null)
+                manifestJson["locked"] = new JObject();
+
+            JObject deps = manifestJson["dependencies"] as JObject;
+            JObject locked = manifestJson["locked"] as JObject;
+
+            if (isRemoval)
+            {
+                if (deps != null) deps.Remove(id);
+                if (locked != null) locked.Remove(id);
+            }
+            else
+            {
+                if (deps != null)
+                {
+                    deps[id] = new JObject
+                    {
+                        ["version"] = version
+                    };
+                }
+
+                JObject vpmDeps = new JObject();
+
+                if (File.Exists(packageJsonPath))
+                {
+                    try
+                    {
+                        var pkgJson = JObject.Parse(File.ReadAllText(packageJsonPath));
+
+                        var found = pkgJson["vpmDependencies"] as JObject;
+                        if (found == null)
+                            found = pkgJson["dependencies"] as JObject;
+
+                        if (found != null)
+                            vpmDeps = (JObject)found.DeepClone();
+                    }
+                    catch
+                    {
+
+                    }
+                }
+
+                if (locked != null)
+                {
+                    locked[id] = new JObject
+                    {
+                        ["version"] = version,
+                        ["dependencies"] = vpmDeps
+                    };
+                }
+            }
+
+            File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.Indented));
+
+            string lockPath = manifestPath + ".lock";
+
+            if (File.Exists(lockPath))
+            {
+                try { File.Delete(lockPath); }
+                catch { }
+            }
+
+            await Task.FromResult(0);
+        }
+        public async Task InstallLatestVersion(ProjectPackage package, bool force = false)
+        {
+            if (package == null) return;
+
+            string latest = null;
+
+            foreach (var entry in _repoCache.Values)
+            {
+                var pkgData = entry.data["packages"]?[package.ID];
+                var versions = pkgData?["versions"] as JObject;
+                if (versions == null) continue;
+
+                latest = versions.Properties()
+                    .Select(p => p.Name)
+                    .OrderByDescending(ParseVersion)
+                    .FirstOrDefault();
+
+                break;
+            }
+
+            if (string.IsNullOrWhiteSpace(latest))
+                return;
+
+            await InstallOrUpdatePackage(package, latest, force);
+        }
+        public async Task LoadProject(ProjectItem project)
+        {
+            if (project == null) return;
+            currentproject = project;
+            ProjectTitleText.Text = project.ProjectName;
+
+            string manifestPath = Path.Combine(project.ProjectPath, "Packages", "vpm-manifest.json");
+            string unityPath = Path.Combine(project.ProjectPath, "ProjectSettings", "ProjectVersion.txt");
+            if (!File.Exists(manifestPath)) return;
+
+            bool needsFetch = _repoCache.Count == 0 ||
+                              _repoCache.Values.Any(e => DateTime.Now - e.fetchedAt > CacheExpiry);
+
+            if (needsFetch)
+            {
+                SetLoadingState(true);
+                foreach (var repo in App.savedata.Repositories)
+                {
+                    try
+                    {
+                        var data = JObject.Parse(await client.GetStringAsync(repo.Url));
+                        _repoCache[repo.Url] = (data, DateTime.Now);
+                    }
+                    catch { }
+                }
+                SetLoadingState(false);
+            }
+
+            var manifestJson = JObject.Parse(File.ReadAllText(manifestPath));
+            var locked = manifestJson["locked"] as JObject;
+            var userDependencies = manifestJson["dependencies"] as JObject;
+
+            var packageLookup = new Dictionary<string, ProjectPackage>();
+
+            if (locked != null)
+            {
+                foreach (var prop in locked.Properties())
+                {
+                    var rawVersion = prop.Value["version"]?.ToString();
+
+                    bool isLocal = !string.IsNullOrEmpty(rawVersion) &&
+                                   rawVersion.StartsWith("file:");
+
+                    var cleanedVersion = isLocal ? null : rawVersion;
+
+                    var package = new ProjectPackage()
+                    {
+                        ID = prop.Name,
+                        Name = prop.Name,
+                        CurrentVersion = cleanedVersion,
+                        SelectedVersion = rawVersion,
+                        IsInstalled = true,
+                        VersionList = new List<string>()
+                    };
+
+                    foreach (var entry in _repoCache.Values)
+                    {
+                        var pkgData = entry.data["packages"]?[package.ID];
+                        if (pkgData != null)
+                        {
+                            var versions = pkgData["versions"] as JObject;
+                            if (versions != null)
+                            {
+                                package.VersionList = versions.Properties()
+                                    .Select(p => p.Name)
+                                    .OrderByDescending(v => ParseVersion(v))
+                                    .ToList();
+
+                                package.LatestVersion = package.VersionList.FirstOrDefault();
+                                package.Name = versions[package.LatestVersion]?["displayName"]?.ToString()
+                                              ?? package.ID;
+                            }
+                            break;
+                        }
+                    }
+
+                    if (package.LatestVersion == null)
+                    {
+                        package.Status = CompatibilityStatus.Incompatible;
+                        package.IncompatibleReason = "Package not found in your repositories";
+
+                        string localPath = Path.Combine(project.ProjectPath, "Packages", package.ID, "package.json");
+
+                        if (File.Exists(localPath))
+                        {
+                            try
+                            {
+                                var pkgJson = JObject.Parse(File.ReadAllText(localPath));
+                                var version = pkgJson["version"]?.ToString();
+
+                                if (!string.IsNullOrEmpty(version))
+                                {
+                                    package.LatestVersion = version;
+
+                                    if (string.IsNullOrEmpty(package.CurrentVersion))
+                                        package.CurrentVersion = package.ID;
+                                }
+
+                                package.VersionList = new List<string> { version ?? package.ID };
+                            }
+                            catch { }
+                        }
+                    }
+
+                    packageLookup[package.ID] = package;
+                }
+            }
+
+            if (locked != null)
+            {
+                foreach (var prop in locked.Properties())
+                {
+                    if (!packageLookup.TryGetValue(prop.Name, out var parentPackage)) continue;
+
+                    var subDeps = prop.Value["dependencies"] as JObject;
+                    if (subDeps != null)
+                    {
+                        foreach (var d in subDeps.Properties())
+                        {
+                            if (packageLookup.TryGetValue(d.Name, out var childPackage))
+                            {
+                                parentPackage.Dependencies.Add(childPackage);
+                                childPackage.IsADependency = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            var availableList = new List<ProjectPackage>();
+
+            foreach (var entry in _repoCache.Values)
+            {
+                var repoPackages = entry.data["packages"] as JObject;
+                if (repoPackages == null) continue;
+
+                foreach (var pkg in repoPackages.Properties())
+                {
+                    if (packageLookup.ContainsKey(pkg.Name)) continue;
+
+                    var versions = pkg.Value["versions"] as JObject;
+                    var latestVer = versions?.Properties()
+                        .Select(p => p.Name)
+                        .OrderByDescending(v => ParseVersion(v))
+                        .FirstOrDefault();
+
+                    if (latestVer != null)
+                    {
+                        availableList.Add(new ProjectPackage()
+                        {
+                            ID = pkg.Name,
+                            Name = versions[latestVer]?["displayName"]?.ToString() ?? pkg.Name,
+                            IsInstalled = false,
+                            LatestVersion = latestVer,
+                            VersionList = versions.Properties()
+                                .Select(p => p.Name)
+                                .OrderByDescending(v => ParseVersion(v))
+                                .ToList(),
+                            SelectedVersion = latestVer,
+                            CurrentVersion = null
+                        });
+                    }
+                }
+            }
+
+            var finalDisplayList = new List<ProjectPackage>();
+
+            if (userDependencies != null)
+                foreach (var prop in userDependencies.Properties())
+                    if (packageLookup.TryGetValue(prop.Name, out var p))
+                        finalDisplayList.Add(p);
+
+            foreach (var p in packageLookup.Values)
+                if (!finalDisplayList.Contains(p))
+                    finalDisplayList.Add(p);
+
+            finalDisplayList.AddRange(availableList.OrderBy(p => p.Name));
+
+            allPackages = finalDisplayList;
+            ApplyFilter();
+
+            try
+            {
+                if (File.Exists(unityPath))
+                {
+                    var line = File.ReadLines(unityPath)
+                        .FirstOrDefault(l => l.StartsWith("m_EditorVersion:"));
+
+                    if (line != null)
+                        UnityVersionText.Content = line.Split(':')[1].Trim();
+                }
+            }
+            catch
+            {
+                UnityVersionText.Content = "Unknown";
+            }
+        }
+
+        private void ApplyFilter()
+        {
+            string query = SearchBox.Text.ToLower();
+
+            IEnumerable<ProjectPackage> filtered = allPackages.Where(p =>
+                p.ID.ToLower().Contains(query) || (p.Name?.ToLower().Contains(query) ?? false));
+
+            if (_activeFilter == "Installed")
+                filtered = filtered.Where(p => p.IsInstalled);
+            else if (_activeFilter == "NotInstalled")
+                filtered = filtered.Where(p => !p.IsInstalled);
+            else if (_activeFilter == "Updates")
+                filtered = filtered.Where(p => p.HasUpdate);
+
+            if (_activeSortField == "Status")
+            {
+                filtered = _sortAscending
+                    ? filtered.OrderByDescending(p => p.IsInstalled).ThenByDescending(p => p.HasUpdate)
+                    : filtered.OrderBy(p => p.IsInstalled);
+            }
+            else if (_activeSortField == "Version")
+            {
+                filtered = _sortAscending
+                    ? filtered.OrderBy(p => ParseVersion(p.CurrentVersion ?? "0.0"))
+                    : filtered.OrderByDescending(p => ParseVersion(p.CurrentVersion ?? "0.0"));
+            }
+            else
+            {
+                filtered = _sortAscending
+                    ? filtered.OrderBy(p => p.Name)
+                    : filtered.OrderByDescending(p => p.Name);
+            }
+
+            PackageListBox.ItemsSource = filtered.ToList();
+        }
+
+        private void UpdateSortButtonStyles()
+        {
+            foreach (var btn in new[] { SortName, SortStatus, SortVersion })
+            {
+                bool active = (btn.Tag as string) == _activeSortField;
+                btn.Opacity = active ? 1.0 : 0.4;
+                string tag = btn.Tag as string;
+                string arrow = active ? (_sortAscending ? " ↑" : " ↓") : "";
+                if (tag == "Name") btn.Content = "NAME" + arrow;
+                else if (tag == "Status") btn.Content = "STATUS" + arrow;
+                else if (tag == "Version") btn.Content = "VERSION" + arrow;
+            }
+        }
+
+        private void SetLoadingState(bool loading)
+        {
+            LoadingOverlay.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+            PackageListBox.IsEnabled = !loading;
+        }
+
+        private void FilterTab_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                _activeFilter = btn.Tag as string;
+                UpdateFilterTabStyles();
+                ApplyFilter();
+            }
+        }
+
+        private void UpdateFilterTabStyles()
+        {
+            foreach (var btn in new[] { FilterAll, FilterInstalled, FilterNotInstalled, FilterUpdates })
+            {
+                btn.Background = (btn.Tag as string) == _activeFilter
+                    ? System.Windows.Media.Brushes.White
+                    : System.Windows.Media.Brushes.Transparent;
+                btn.Foreground = (btn.Tag as string) == _activeFilter
+                    ? System.Windows.Media.Brushes.Black
+                    : System.Windows.Media.Brushes.White;
+            }
+        }
+
+        private void SortBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                string field = btn.Tag as string;
+                if (_activeSortField == field)
+                    _sortAscending = !_sortAscending;
+                else
+                {
+                    _activeSortField = field;
+                    _sortAscending = true;
+                }
+                UpdateSortButtonStyles();
+                ApplyFilter();
+            }
+        }
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
+        public async void RefreshBtn_Click(object sender, RoutedEventArgs e) { _repoCache.Clear(); await LoadProject(currentproject); }
+        private void BackBtn_Click(object sender, RoutedEventArgs e) => UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+        private void LaunchProjectBtn_Click(object sender, RoutedEventArgs e) { if (currentproject != null) App.OpenProject(currentproject); }
+        private void OpenFilePath_Click(object sender, RoutedEventArgs e) => App.OpenProjectPath(currentproject.ProjectPath);
+        private void InstallPackage_Click(object sender, RoutedEventArgs e) { if (((Button)sender).DataContext is ProjectPackage p) _ = InstallOrUpdatePackage(p, p.SelectedVersion); }
+
+        private async void PackageUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            if (((Button)sender).DataContext is ProjectPackage p)
+            {
+                try
+                {
+                    p.CurrentAction = PackageAction.Updating;
+                    await InstallOrUpdatePackage(p, p.LatestVersion);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to update: {ex.Message}");
+                }
+            }
+        }
+
+        private async void RemovePackage_Click(object sender, RoutedEventArgs e)
+        {
+            if (((Button)sender).DataContext is ProjectPackage p &&
+                MessageBox.Show($"Remove {p.ID}?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            {
+                p.CurrentAction = PackageAction.Removing;
+                p.ProgressingControl = "Remove";
+                p.InstallProgress = 0.1;
+
+                try
+                {
+                    string path = Path.Combine(currentproject.ProjectPath, "Packages", p.ID);
+                    p.InstallProgress = 0.4;
+                    if (Directory.Exists(path))
+                        await Task.Run(() => Directory.Delete(path, true));
+                    p.InstallProgress = 0.7;
+                    await UpdateManifest(p.ID, null, true);
+                    p.InstallProgress = 1.0;
+                    await Task.Delay(200);
+                    await LoadProject(currentproject);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error removing package: {ex.Message}");
+                }
+                finally
+                {
+                    p.ProgressingControl = null;
+                    p.CurrentAction = PackageAction.None;
+                    p.InstallProgress = 0;
+                }
+            }
+        }
+
+        private async Task RunBulkOperation(
+            List<(ProjectPackage package, string version)> targets,
+            Func<ProjectPackage, string, Task> operation,
+            string label)
+        {
+            if (targets.Count == 0) return;
+
+            _isBulkOperation = true;
+
+            BulkProgressBorder.Visibility = Visibility.Visible;
+            UpdateAll.IsEnabled = false;
+            ReinstallAll.IsEnabled = false;
+
+            int completed = 0;
+            int total = targets.Count;
+
+            int maxParallel = 3;
+            var semaphore = new SemaphoreSlim(maxParallel);
+
+            var tasks = targets.Select(async t =>
+            {
+                await semaphore.WaitAsync();
+                try
+                {
+                    await operation(t.package, t.version);
+                }
+                finally
+                {
+                    semaphore.Release();
+
+                    int done = Interlocked.Increment(ref completed);
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        BulkProgressText.Text = $"{label} {done} / {total}";
+                        BulkProgressFill.Width =
+                            (double)done / total * BulkProgressBorder.ActualWidth;
+                    });
+                }
+            });
+
+            await Task.WhenAll(tasks);
+
+            _isBulkOperation = false;
+
+            await LoadProject(currentproject);
+
+            BulkProgressText.Text = $"Done {total} / {total}";
+            BulkProgressFill.Width = BulkProgressBorder.ActualWidth;
+
+            await Task.Delay(800);
+
+            BulkProgressBorder.Visibility = Visibility.Collapsed;
+            UpdateAll.IsEnabled = true;
+            ReinstallAll.IsEnabled = true;
+        }
+
+        private async void UpdateAll_Click(object sender, RoutedEventArgs e)
+        {
+            var targets = allPackages
+                .Where(p => p.IsInstalled && p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion))
+                .Select(p => (p, p.LatestVersion))
+                .ToList();
+            await RunBulkOperation(targets, (p, v) => InstallOrUpdatePackage(p, v), "UPDATING");
+        }
+
+        private async void ReinstallAll_Click(object sender, RoutedEventArgs e)
+        {
+            var targets = allPackages
+                .Where(p => p.IsInstalled && !string.IsNullOrEmpty(p.CurrentVersion))
+                .Select(p => (p, p.CurrentVersion))
+                .ToList();
+            await RunBulkOperation(targets, (p, v) => InstallOrUpdatePackage(p, v, force: true), "REINSTALLING");
+        }
+
+        private void VersionSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.DataContext is ProjectPackage p)
+            {
+                string ver = cb.SelectedItem as string;
+                if (!string.IsNullOrEmpty(ver) && ver != p.CurrentVersion)
+                {
+                    if (MessageBox.Show($"Change {p.ID} to {ver}?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                    {
+                        p.CurrentAction = PackageAction.ChangingVersion;
+                        _ = InstallOrUpdatePackage(p, ver);
+                    }
+                    else
+                    {
+                        cb.SelectionChanged -= VersionSelector_SelectionChanged;
+                        cb.SelectedItem = p.IsInstalled ? p.CurrentVersion : p.LatestVersion;
+                        cb.SelectionChanged += VersionSelector_SelectionChanged;
+                    }
+                }
+            }
+        }
+
+        private void RemoveProjectBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentproject == null) return;
+            if (MessageBox.Show($"Remove {currentproject.ProjectName} from BVCC?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            {
+                App.savedata.Projects.Remove(currentproject);
+                App.SaveToDisk();
+                App.ProjectsPage.RefreshProjects();
+                UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+            }
+        }
+        private void LoadingOverlay_Loaded(object sender, RoutedEventArgs e)
+        {
+            var sb = (Storyboard)Resources["ShimmerStoryboard"];
+            sb.Begin();
+        }
+    }
+}

@@ -1,6 +1,6 @@
 <p align="center">
   <img src="3d512.png" width="100" align="middle" />
-  <span style="font-size:32px; font-weight:700; margin-left:12px;">
+  <span style="font-size:100px; font-weight:700; margin-left:12px;">
     BVCC
   </span>
 </p>

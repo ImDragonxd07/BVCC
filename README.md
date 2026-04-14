@@ -1,12 +1,18 @@
-<p align="left">
-  <img src="3d512.png" width="100" align="left" />
+<p align="center">
+  <img src="3d512.png" width="100" />
 </p>
 
-# BVCC
+<h1 align="center">BVCC</h1>
 
-BVCC (Better VRChat Creator Companion) is a custom tool designed to improve quality of life over the standard VRChat Creator Companion.
+<p align="center">
+  Better VRChat Creator Companion
+</p>
 
-<br clear="left"/>
+<br>
+
+BVCC is a custom tool designed to improve quality of life over the standard VRChat Creator Companion.
+
+---
 
 ## Setup
 

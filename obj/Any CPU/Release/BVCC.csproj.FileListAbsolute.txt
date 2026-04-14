@@ -1,0 +1,16 @@
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\BVCC.csprojResolveAssemblyReference.cache
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\NewFromTemplate.baml
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\ProjectsPage.baml
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\SettingsPage.baml
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\SplashScreen.baml
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\NewFromTemplate.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\NewProjectSettingsPage.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\PackageManagerPage.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\ProjectsPage.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\SettingsPage.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\SplashScreen.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\App.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\BVCC_Content.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\GeneratedInternalTypeHelper.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\BVCC_MarkupCompile.cache
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Any CPU\Release\BVCC_MarkupCompile.lref

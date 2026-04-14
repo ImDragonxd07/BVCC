@@ -1,11 +1,11 @@
-<p align="center">
-  <img src="3d512.png" alt="BVCC Banner" width="100"/>
+<p align="left">
+  <img src="assets/bvcc-banner.png" width="100" align="left" />
 </p>
 
-<h1 align="center">Better VRChat Creator Companion (BVCC)</h1>
+# BVCC
 
 <p align="center">
-  A custom VRChat project and package management tool for Unity-based workflows.
+  Better VRChat Creator Companion (BVCC) is a custom VRChat project and package management tool for Unity-based workflows.
 </p>
 
 BVCC is a custom VRChat project and package management tool designed to streamline project setup and package handling within Unity-based VRChat development workflows.

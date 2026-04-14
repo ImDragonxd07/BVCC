@@ -1,4 +1,4 @@
-<img src="banner.png" width="200" align="middle" />
+<img src="banner.png" width="200" align="center" />
 <p align="center" style="font-size:18px;">
   Better VRChat Creator Companion
 </p>

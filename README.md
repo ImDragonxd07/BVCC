@@ -30,10 +30,10 @@
 
 | Main Dashboard | Package Manager |
 | :---: | :---: |
-| <img src="githubassets/ss1.png" width="100%" /> | <img src="githubassets/ss2.png" width="100%" /> |
+| <img src="githubassets/ss2.png" width="100%" /> | <img src="githubassets/ss1.png" width="100%" /> |
 
 <p align="center">
-  <strong>Advanced Settings</strong><br>
+  <strong>Project Creation</strong><br>
   <img src="githubassets/ss3.png" width="70%" />
 </p>
 

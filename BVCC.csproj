@@ -129,6 +129,7 @@
     <Compile Include="NewProjectSettingsPage.xaml.cs">
       <DependentUpon>NewProjectSettingsPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ProtocolHandler.cs" />
     <Compile Include="SplashScreen.xaml.cs">
       <DependentUpon>SplashScreen.xaml</DependentUpon>
     </Compile>

@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Shapes;
 using static BVCC.Data;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 using Application = System.Windows.Application;
@@ -103,15 +104,19 @@ namespace BVCC
         {
             RefreshProjects();
         }
-
-        public ProjectItem ImportProjectFromFile(string path)
+        public ProjectItem GetProjectItemFromPath(string path)
         {
             ProjectItem newitem = new ProjectItem
             {
-                ProjectName = Path.GetFileName(path),
+                ProjectName = System.IO.Path.GetFileName(path),
                 ProjectPath = (string)path,
                 LastModified = DateTime.Now
             };
+            return newitem;
+        }
+        public ProjectItem ImportProjectFromFile(string path)
+        {
+            ProjectItem newitem = GetProjectItemFromPath(path);
             if (App.savedata.Projects.Contains(newitem)) { 
                 System.Windows.MessageBox.Show("Project already exists in the list.", "Import Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return null; }

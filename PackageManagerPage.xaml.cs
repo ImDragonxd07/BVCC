@@ -17,12 +17,12 @@ using static BVCC.Data.ProjectPackage;
 
 namespace BVCC
 {
-    public partial class PackageManagerPage : UserControl
+    public partial class PackageManagerPage : System.Windows.Controls.UserControl
     {
         private ProjectItem currentproject;
         private List<ProjectPackage> allPackages = new List<ProjectPackage>();
         private static readonly HttpClient client = new HttpClient();
-        private Dictionary<string, (JObject data, DateTime fetchedAt)> _repoCache = new Dictionary<string, (JObject, DateTime)>();
+        private Dictionary<string, (JObject data, DateTime fetchedAt)> _repoCache = new Dictionary<string, (JObject data, DateTime fetchedAt)>();
         private static readonly TimeSpan CacheExpiry = TimeSpan.FromHours(1);
         private bool _isBulkOperation = false;
         private SemaphoreSlim _installLock = new SemaphoreSlim(1, 1);
@@ -74,7 +74,37 @@ namespace BVCC
                 }
             }
         }
-
+        private bool HasWriteAccess(string directoryPath)
+        {
+            try
+            {
+                string testFile = Path.Combine(directoryPath, $".write_test_{Guid.NewGuid()}");
+                using (FileStream fs = File.Create(testFile, 1, FileOptions.DeleteOnClose))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        private bool IsFileLocked(FileInfo file)
+        {
+            if (!file.Exists) return false;
+            try
+            {
+                using (FileStream stream = file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    stream.Close();
+                }
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+            return false;
+        }
         private HashSet<string> _installing = new HashSet<string>();
         private readonly object _installingLock = new object();
 
@@ -82,7 +112,28 @@ namespace BVCC
         {
             if (package == null) return;
             if (string.IsNullOrEmpty(version)) return;
-
+            string packagesPath = Path.Combine(currentproject.ProjectPath, "Packages");
+            string manifestPath = Path.Combine(packagesPath, "vpm-manifest.json");
+            DriveInfo drive = new DriveInfo(Path.GetPathRoot(currentproject.ProjectPath));
+            long minSpace = 100L * 1024L * 1024L;
+            if (drive.AvailableFreeSpace < minSpace)
+            {
+                var lowdiskspacemsg= MessageBox.Show("Low Disk Space, Installing now could lead to a corrupted manifest file", App.savedata.AppName, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
+                if(lowdiskspacemsg == MessageBoxResult.Cancel)
+                {
+                    return;
+                }
+            }
+            if (!HasWriteAccess(packagesPath))
+            {
+                MessageBox.Show("Permission Denied: Cannot write to the Packages folder. Is the project in a protected directory?", App.savedata.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (IsFileLocked(new FileInfo(manifestPath)))
+            {
+                MessageBox.Show("Manifest is locked: Is another process using it?", App.savedata.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             lock (_installingLock)
             {
                 if (_installing.Contains(package.ID))
@@ -311,193 +362,204 @@ namespace BVCC
         public async Task LoadProject(ProjectItem project)
         {
             if (project == null) return;
+
             currentproject = project;
             ProjectTitleText.Text = project.ProjectName;
+            SetLoadingState(true);
 
-            string manifestPath = Path.Combine(project.ProjectPath, "Packages", "vpm-manifest.json");
-            string unityPath = Path.Combine(project.ProjectPath, "ProjectSettings", "ProjectVersion.txt");
-            if (!File.Exists(manifestPath)) return;
-
-            bool needsFetch = _repoCache.Count == 0 ||
-                              _repoCache.Values.Any(e => DateTime.Now - e.fetchedAt > CacheExpiry);
-
-            if (needsFetch)
+            try
             {
-                SetLoadingState(true);
-                foreach (var repo in App.savedata.Repositories)
+
+                var (finalList, unityVersion) = await Task.Run(async () =>
                 {
-                    try
+
+                    bool needsFetch = _repoCache.Count == 0 ||
+                                      _repoCache.Values.Any(e => DateTime.Now - e.fetchedAt > CacheExpiry);
+
+                    if (needsFetch)
                     {
-                        var data = JObject.Parse(await client.GetStringAsync(repo.Url));
-                        _repoCache[repo.Url] = (data, DateTime.Now);
-                    }
-                    catch { }
-                }
-                SetLoadingState(false);
-            }
 
-            var manifestJson = JObject.Parse(File.ReadAllText(manifestPath));
-            var locked = manifestJson["locked"] as JObject;
-            var userDependencies = manifestJson["dependencies"] as JObject;
-
-            var packageLookup = new Dictionary<string, ProjectPackage>();
-
-            if (locked != null)
-            {
-                foreach (var prop in locked.Properties())
-                {
-                    var rawVersion = prop.Value["version"]?.ToString();
-
-                    bool isLocal = !string.IsNullOrEmpty(rawVersion) &&
-                                   rawVersion.StartsWith("file:");
-
-                    var cleanedVersion = isLocal ? null : rawVersion;
-
-                    var package = new ProjectPackage()
-                    {
-                        ID = prop.Name,
-                        Name = prop.Name,
-                        CurrentVersion = cleanedVersion,
-                        SelectedVersion = rawVersion,
-                        IsInstalled = true,
-                        VersionList = new List<string>()
-                    };
-
-                    foreach (var entry in _repoCache.Values)
-                    {
-                        var pkgData = entry.data["packages"]?[package.ID];
-                        if (pkgData != null)
-                        {
-                            var versions = pkgData["versions"] as JObject;
-                            if (versions != null)
-                            {
-                                package.VersionList = SortVersions(versions.Properties().Select(p => p.Name), ascending: false, includePreRelease: _showPreRelease);
-
-
-                                package.LatestVersion = SortVersions(versions.Properties().Select(p => p.Name), ascending: false, includePreRelease: _showPreRelease).FirstOrDefault();
-                                package.Name = versions[package.LatestVersion]?["displayName"]?.ToString()
-                                              ?? package.ID;
-                            }
-                            break;
-                        }
-                    }
-
-                    if (package.LatestVersion == null)
-                    {
-                        package.Status = CompatibilityStatus.Incompatible;
-                        package.IncompatibleReason = "Package not found in your repositories";
-
-                        string localPath = Path.Combine(project.ProjectPath, "Packages", package.ID, "package.json");
-
-                        if (File.Exists(localPath))
+                        foreach (var repo in App.savedata.Repositories.ToList())
                         {
                             try
                             {
-                                var pkgJson = JObject.Parse(File.ReadAllText(localPath));
-                                var version = pkgJson["version"]?.ToString();
+                                var data = JObject.Parse(await client.GetStringAsync(repo.Url));
+                                lock (_repoCache)
 
-                                if (!string.IsNullOrEmpty(version))
                                 {
-                                    package.LatestVersion = version;
-
-                                    if (string.IsNullOrEmpty(package.CurrentVersion))
-                                        package.CurrentVersion = package.ID;
+                                    _repoCache[repo.Url] = (data, DateTime.Now);
                                 }
-
-                                package.VersionList = new List<string> { version ?? package.ID };
                             }
                             catch { }
                         }
                     }
 
-                    packageLookup[package.ID] = package;
-                }
-            }
+                    string manifestPath = Path.Combine(project.ProjectPath, "Packages", "vpm-manifest.json");
+                    string unityPath = Path.Combine(project.ProjectPath, "ProjectSettings", "ProjectVersion.txt");
 
-            if (locked != null)
-            {
-                foreach (var prop in locked.Properties())
-                {
-                    if (!packageLookup.TryGetValue(prop.Name, out var parentPackage)) continue;
+                    if (!File.Exists(manifestPath)) return (new List<ProjectPackage>(), "Unknown");
 
-                    var subDeps = prop.Value["dependencies"] as JObject;
-                    if (subDeps != null)
+                    string manifestContent;
+                    using (var fs = new FileStream(manifestPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var sr = new StreamReader(fs))
+                        manifestContent = sr.ReadToEnd();
+
+                    var manifestJson = JObject.Parse(manifestContent);
+                    var locked = manifestJson["locked"] as JObject;
+                    var userDependencies = manifestJson["dependencies"] as JObject;
+                    var packageLookup = new Dictionary<string, ProjectPackage>();
+
+                    if (locked != null)
                     {
-                        foreach (var d in subDeps.Properties())
+                        foreach (var prop in locked.Properties())
                         {
-                            if (packageLookup.TryGetValue(d.Name, out var childPackage))
+                            var rawVersion = prop.Value["version"]?.ToString();
+                            bool isLocal = !string.IsNullOrEmpty(rawVersion) && rawVersion.StartsWith("file:");
+                            var cleanedVersion = isLocal ? null : rawVersion;
+
+                            var package = new ProjectPackage()
                             {
-                                parentPackage.Dependencies.Add(childPackage);
-                                childPackage.IsADependency = true;
+                                ID = prop.Name,
+                                Name = prop.Name,
+                                CurrentVersion = cleanedVersion,
+                                SelectedVersion = rawVersion,
+                                IsInstalled = true,
+                                VersionList = new List<string>()
+                            };
+
+                            foreach (var entry in _repoCache.Values)
+                            {
+                                var pkgData = entry.data["packages"]?[package.ID];
+                                if (pkgData != null)
+                                {
+                                    var versions = pkgData["versions"] as JObject;
+                                    if (versions != null)
+                                    {
+                                        var versionNames = versions.Properties().Select(p => p.Name).ToList();
+                                        package.VersionList = SortVersions(versionNames, false, _showPreRelease);
+                                        package.LatestVersion = package.VersionList.FirstOrDefault();
+                                        package.Name = versions[package.LatestVersion]?["displayName"]?.ToString() ?? package.ID;
+                                    }
+                                    break;
+                                }
+                            }
+
+                            if (package.LatestVersion == null)
+                            {
+                                package.Status = CompatibilityStatus.Incompatible;
+                                package.IncompatibleReason = "Not in repositories";
+
+                                string localPkgJson = Path.Combine(project.ProjectPath, "Packages", package.ID, "package.json");
+                                if (File.Exists(localPkgJson))
+                                {
+                                    try
+                                    {
+                                        var pkgJson = JObject.Parse(File.ReadAllText(localPkgJson));
+                                        var ver = pkgJson["version"]?.ToString();
+                                        package.LatestVersion = ver;
+                                        if (string.IsNullOrEmpty(package.CurrentVersion)) package.CurrentVersion = package.ID;
+                                        package.VersionList = new List<string> { ver ?? package.ID };
+                                    }
+                                    catch { }
+                                }
+                            }
+                            packageLookup[package.ID] = package;
+                        }
+                    }
+
+                    if (locked != null)
+                    {
+                        foreach (var prop in locked.Properties())
+                        {
+                            if (packageLookup.TryGetValue(prop.Name, out var parentPackage))
+                            {
+                                var subDeps = prop.Value["dependencies"] as JObject;
+                                if (subDeps != null)
+                                {
+                                    foreach (var d in subDeps.Properties())
+                                    {
+                                        if (packageLookup.TryGetValue(d.Name, out var childPackage))
+                                        {
+                                            parentPackage.Dependencies.Add(childPackage);
+                                            childPackage.IsADependency = true;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }
 
-            var availableList = new List<ProjectPackage>();
-
-            foreach (var entry in _repoCache.Values)
-            {
-                var repoPackages = entry.data["packages"] as JObject;
-                if (repoPackages == null) continue;
-
-                foreach (var pkg in repoPackages.Properties())
-                {
-                    if (packageLookup.ContainsKey(pkg.Name)) continue;
-
-                    var versions = pkg.Value["versions"] as JObject;
-                    var latestVer = versions?.Properties()
-                        .Select(p => p.Name)
-                        .OrderByDescending(v => ParseVersion(v))
-                        .FirstOrDefault();
-
-                    if (latestVer != null)
+                    var availableList = new List<ProjectPackage>();
+                    foreach (var entry in _repoCache.Values)
                     {
-                        availableList.Add(new ProjectPackage()
+                        var repoPackages = entry.data["packages"] as JObject;
+                        if (repoPackages == null) continue;
+
+                        foreach (var pkg in repoPackages.Properties())
                         {
-                            ID = pkg.Name,
-                            Name = versions[latestVer]?["displayName"]?.ToString() ?? pkg.Name,
-                            IsInstalled = false,
-                            LatestVersion = latestVer,
-                            VersionList = SortVersions(versions.Properties().Select(p => p.Name), ascending: false, includePreRelease: _showPreRelease),
-                            SelectedVersion = latestVer,
-                            CurrentVersion = null
-                        });
+                            if (packageLookup.ContainsKey(pkg.Name)) continue;
+
+                            var versions = pkg.Value["versions"] as JObject;
+                            if (versions == null) continue;
+
+                            var versionNames = versions.Properties().Select(p => p.Name).ToList();
+                            var sorted = SortVersions(versionNames, false, _showPreRelease);
+                            var latestVer = sorted.FirstOrDefault();
+
+                            if (latestVer != null)
+                            {
+                                availableList.Add(new ProjectPackage()
+                                {
+                                    ID = pkg.Name,
+                                    Name = versions[latestVer]?["displayName"]?.ToString() ?? pkg.Name,
+                                    IsInstalled = false,
+                                    LatestVersion = latestVer,
+                                    VersionList = sorted,
+                                    SelectedVersion = latestVer
+                                });
+                            }
+                        }
                     }
-                }
+
+                    var finalDisplayList = new List<ProjectPackage>();
+                    if (userDependencies != null)
+                    {
+                        foreach (var prop in userDependencies.Properties())
+                            if (packageLookup.TryGetValue(prop.Name, out var p))
+                                finalDisplayList.Add(p);
+                    }
+
+                    foreach (var p in packageLookup.Values)
+                        if (!finalDisplayList.Contains(p)) finalDisplayList.Add(p);
+
+                    finalDisplayList.AddRange(availableList.OrderBy(p => p.Name));
+
+                    string uVer = "Unknown";
+                    try
+                    {
+                        if (File.Exists(unityPath))
+                        {
+                            var line = File.ReadLines(unityPath).FirstOrDefault(l => l.StartsWith("m_EditorVersion:"));
+                            if (line != null) uVer = line.Split(':')[1].Trim();
+                        }
+                    }
+                    catch { }
+
+                    return (finalDisplayList, uVer);
+                });
+
+                allPackages = finalList;
+                UnityVersionText.Content = unityVersion;
+                ApplyFilter();
             }
-
-            var finalDisplayList = new List<ProjectPackage>();
-
-            if (userDependencies != null)
-                foreach (var prop in userDependencies.Properties())
-                    if (packageLookup.TryGetValue(prop.Name, out var p))
-                        finalDisplayList.Add(p);
-
-            foreach (var p in packageLookup.Values)
-                if (!finalDisplayList.Contains(p))
-                    finalDisplayList.Add(p);
-
-            finalDisplayList.AddRange(availableList.OrderBy(p => p.Name));
-
-            allPackages = finalDisplayList;
-            ApplyFilter();
-
-            try
+            catch (Exception ex)
             {
-                if (File.Exists(unityPath))
-                {
-                    var line = File.ReadLines(unityPath)
-                        .FirstOrDefault(l => l.StartsWith("m_EditorVersion:"));
 
-                    if (line != null)
-                        UnityVersionText.Content = line.Split(':')[1].Trim();
-                }
+                System.Diagnostics.Debug.WriteLine($"LoadProject Error: {ex.Message}");
             }
-            catch
+            finally
             {
-                UnityVersionText.Content = "Unknown";
+                SetLoadingState(false);
             }
         }
 

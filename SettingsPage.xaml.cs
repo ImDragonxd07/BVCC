@@ -5,9 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Packaging;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Policy;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using static BVCC.Data;
@@ -36,80 +38,97 @@ namespace BVCC
             CheckForUpdatesCheckBox.IsChecked = App.savedata.CheckForUpdates;
         }
 
+        public async Task<List<RepoItem>> FetchRepoPackagesAsync(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return new List<RepoItem>();
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return new List<RepoItem>();
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", $"{App.savedata.AppName}-App");
+                client.Timeout = TimeSpan.FromSeconds(10);
+
+                try
+                {
+                    string jsonString = await client.GetStringAsync(uri);
+
+                    if (string.IsNullOrWhiteSpace(jsonString))
+                        return new List<RepoItem>();
+
+                    JObject data;
+
+                    try
+                    {
+                        data = JObject.Parse(jsonString);
+                    }
+                    catch
+                    {
+                        return new List<RepoItem>();
+                    }
+
+                    JObject packagesObj = data["packages"] as JObject;
+
+                    if (packagesObj == null)
+                        return new List<RepoItem>();
+
+                    var result = new List<RepoItem>();
+
+                    foreach (var pkgProp in packagesObj.Properties())
+                    {
+                        string pkgId = pkgProp.Name;
+
+                        result.Add(new RepoItem
+                        {
+                            Url = url,
+                            Id = pkgId,
+                            Name = pkgProp.Value["name"]?.ToString() ?? pkgId
+                        });
+                    }
+
+                    return result;
+                }
+                catch
+                {
+                    MessageBox.Show("Failed to fetch or parse the repository data. Please check the URL and try again.");
+                    return new List<RepoItem>();
+                }
+            }
+        }
+        public void AddPackages(List<RepoItem> packages)
+        {
+            if (packages != null && packages.Count > 0)
+            {
+                int added = 0;
+
+                foreach (var pkg in packages)
+                {
+                    bool exists = App.savedata.Repositories.Any(r =>
+                        string.Equals(r.Id, pkg.Id, StringComparison.OrdinalIgnoreCase));
+
+                    if (exists) continue;
+
+                    App.savedata.Repositories.Add(pkg);
+                    added++;
+                }
+
+                App.SaveToDisk();
+                RefreshPage();
+            }
+        }
         private async void AddRepo_Click(object sender, RoutedEventArgs e)
         {
             string url = RepoUrlInput.Text.Trim();
             if (string.IsNullOrWhiteSpace(url)) return;
-
             try
             {
-                using (var client = new HttpClient())
-                {
-                    client.DefaultRequestHeaders.Add("User-Agent", "BVCC-App");
-
-                    string jsonString = await client.GetStringAsync(url);
-                    JObject data = JObject.Parse(jsonString);
-
-                    JObject packagesObj = data["packages"] as JObject;
-                    bool isListing = packagesObj != null;
-                    if (isListing)
-                    {
-                        int added = 0;
-
-                        foreach (var pkgProp in packagesObj.Properties())
-                        {
-                            string pkgId = pkgProp.Name;
-
-                            bool exists = App.savedata.Repositories.Any(r =>
-                                string.Equals(r.Id, pkgId, StringComparison.OrdinalIgnoreCase)
-                            );
-
-                            if (exists) continue;
-
-                            App.savedata.Repositories.Add(new RepoItem
-                            {
-                                Url = url,
-                                Id = pkgId,
-                                Name = pkgProp.Value["name"]?.ToString() ?? pkgId
-                            });
-
-                            added++;
-                        }
-
-                        RefreshPage();
-                        App.SaveToDisk();
-                        //App.PackageManagerPage?.ClearRepoCache();
-
-                        MessageBox.Show($"Added {added} packages from listing.");
-                        return;
-                    }
-
-                    string repoName = data["name"]?.ToString() ?? "Unknown Repo";
-                    string repoId = data["id"]?.ToString() ?? url;
-
-                    bool existsRepo = App.savedata.Repositories.Any(r =>
-                        string.Equals(r.Url, url, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(r.Id, repoId, StringComparison.OrdinalIgnoreCase)
-                    );
-
-                    if (existsRepo)
-                    {
-                        MessageBox.Show("This repository already exists.");
-                        return;
-                    }
-
-                    App.savedata.Repositories.Add(new RepoItem
-                    {
-                        Url = url,
-                        Name = repoName,
-                        Id = repoId
-                    });
-
-                    RepoUrlInput.Text = "";
-                    RefreshPage();
-                    App.SaveToDisk();
-                    //App.PackageManagerPage?.ClearRepoCache();
-                }
+                var packages = await FetchRepoPackagesAsync(url);
+                AddPackages(packages);
+                MessageBox.Show($"Added {packages.Count} packages from listing.");
+                RepoUrlInput.Text = "";
+                return;
             }
             catch (Exception ex)
             {
@@ -234,7 +253,7 @@ namespace BVCC
             using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
             {
                 dialog.Description = "Select the default folder for your Local Repos";
-                dialog.SelectedPath = App.savedata.RepoPath ;
+                dialog.SelectedPath = App.savedata.RepoPath;
                 if (Directory.Exists(ProjectPathBox.Text)) dialog.SelectedPath = ProjectPathBox.Text;
 
                 if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
@@ -376,7 +395,7 @@ namespace BVCC
         {
             try
             {
-                string path = Path.Combine(Directory.GetCurrentDirectory(),"Settings.json");
+                string path = Path.Combine(Directory.GetCurrentDirectory(), "Settings.json");
 
                 System.Diagnostics.Process.Start("explorer.exe", path);
             }

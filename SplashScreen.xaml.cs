@@ -19,31 +19,19 @@ namespace BVCC
 {
     public partial class SplashScreen : System.Windows.Window
     {
-        private bool _isupdating = false;
-        public bool IsUpdating
-        {
-            get
-            {
-
-                return _isupdating;
-            }
-            set
-            {
-                if(value == true)
-                {
-                    LoadingBar.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    LoadingBar.Visibility = Visibility.Collapsed;
-                }
-                _isupdating = value;
-            }
-        }
         public SplashScreen()
         {
             InitializeComponent();
-            LoadingBar.Visibility = Visibility.Collapsed;
+            LoadingBar.IsIndeterminate = true;
+        }
+
+        private void LoadingBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (LoadingBar.Template.FindName("ProgressFill", LoadingBar) is FrameworkElement fill)
+            {
+                double percent = LoadingBar.Value / LoadingBar.Maximum;
+                fill.Width = percent * LoadingBar.ActualWidth;
+            }
         }
     }
 }

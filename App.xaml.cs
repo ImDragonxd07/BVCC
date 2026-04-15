@@ -84,6 +84,12 @@ namespace BVCC
         }
         private async Task OnStartupAsync(StartupEventArgs e)
         {
+            string pendingProtocol = null;
+
+            if (e.Args.Length > 0)
+            {
+                pendingProtocol = e.Args[0];
+            }
             base.OnStartup(e);
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
@@ -172,24 +178,27 @@ namespace BVCC
                     string myCurrentVersion = savedata.AppVersion;
                     if (newestVersion != myCurrentVersion)
                     {
+                        splash.LoadingBar.IsIndeterminate = true;
                         splash.LoadingStatus.Text = $"Downloading update {newestVersion}...";
                         string tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BVCCSetup.exe");
+                        var tcs = new TaskCompletionSource<bool>();
                         using (var client = new System.Net.WebClient())
                         {
-                            client.DownloadProgressChanged += (s, ev) =>
+                            client.DownloadProgressChanged += async (s, ev) =>
                             {
                                 if (splash.LoadingBar.IsIndeterminate)
                                     splash.LoadingBar.IsIndeterminate = false;
-
                                 splash.LoadingBar.Value = ev.ProgressPercentage;
                                 splash.LoadingStatus.Text = $"Downloading: {ev.ProgressPercentage}%";
+                                await Task.Delay(1);
                             };
 
-                            client.DownloadFileCompleted += (s, ev) =>
+                            client.DownloadFileCompleted += async (s, ev) =>
                             {
                                 if (ev.Error == null)
                                 {
-                                    splash.LoadingStatus.Text = "Installing & Restarting...";
+                                    splash.LoadingStatus.Text = "Installing";
+                                    await Task.Delay(800);
                                     savedata.AppVersion = newestVersion;
                                     SaveToDisk();
                                     var startInfo = new System.Diagnostics.ProcessStartInfo
@@ -199,28 +208,38 @@ namespace BVCC
                                         UseShellExecute = true
                                     };
                                     System.Diagnostics.Process.Start(startInfo);
-
+                                    tcs.SetResult(true);
                                     System.Windows.Application.Current.Shutdown();
                                 }
                                 else
                                 {
-                                    splash.IsUpdating = false;
+                                    tcs.SetResult(false);
                                 }
                             };
 
                             client.DownloadFileAsync(new Uri(downloadUrl), tempPath);
+                            await tcs.Task;
                             return;
                         }
                     }
                 }
-                splash.IsUpdating = false;
             }
-            splash.LoadingStatus.Text = "Launching";
+            splash.LoadingStatus.Text = "Initializing";
             SaveToDisk();
-            splash.Hide();
             ProjectsPage = new ProjectsPage();
             SettingsPage = new SettingsPage();
             NewFromTemplatePage = new NewFromTemplate();
+            splash.LoadingStatus.Text = "Register";
+            if (!ProtocolInstaller.IsRegistered())
+            {
+                ProtocolInstaller.RegisterProtocol();
+            }
+            if (!string.IsNullOrWhiteSpace(pendingProtocol))
+            {
+                await ProtocolRouter.HandleAsync(pendingProtocol);
+            }
+            await Task.Delay(500); 
+            splash.Hide();
             Application.Current.MainWindow = ProjectsPage;
             ProjectsPage.Show();
         }

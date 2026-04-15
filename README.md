@@ -52,6 +52,11 @@ Copy and paste these URLs into your repository settings to expand your toolset:
 * **VRChat Official:** `https://vrchat.github.io/packages/index.json` (Included by default)
 
 ---
+### Developers
+
+## Web Links
+bvcc://openproject?path={project path}
+bvcc://addrepo?url={repo.json web link}
 
 ### 🤝 Contributing
 Suggestions and bug reports are welcome! Please open an **Issue** or submit a **Pull Request**.

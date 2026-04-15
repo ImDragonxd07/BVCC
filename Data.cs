@@ -17,7 +17,7 @@ namespace BVCC
         public class SaveData
         {
             public string AppName { get; set; } = "BVCC";
-            public string AppVersion { get; set; } = "0";
+            public string AppVersion { get; set; } = "???";
             public bool CheckForUpdates { get; set; } = true;
             public bool ShowPreReleases { get; set; } = true;
             public bool OpenUnityAfterProjectCreation { get; set; } = false;

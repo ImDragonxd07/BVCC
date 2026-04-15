@@ -19,7 +19,17 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
                         <Grid x:Name="TemplateRoot" ClipToBounds="True">
+
                             <Border Background="{TemplateBinding Background}" CornerRadius="2" />
+
+                            <Grid x:Name="DeterminateRoot">
+                                <Border
+                                    x:Name="ProgressFill"
+                                    Width="0"
+                                    HorizontalAlignment="Left"
+                                    Background="#FF0078D4"
+                                    CornerRadius="2" />
+                            </Grid>
 
                             <Grid x:Name="IndeterminateRoot" Visibility="Collapsed">
                                 <Rectangle
@@ -29,6 +39,7 @@
                                     HorizontalAlignment="Left"
                                     RadiusX="2"
                                     RadiusY="2">
+
                                     <Rectangle.Fill>
                                         <RadialGradientBrush x:Name="GlowBrush" Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
                                             <GradientStop Offset="0.0" Color="#FF60CDFF" />
@@ -48,10 +59,13 @@
                         </Grid>
 
                         <ControlTemplate.Triggers>
+
                             <Trigger Property="IsIndeterminate" Value="True">
                                 <Setter TargetName="IndeterminateRoot" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="DeterminateRoot" Property="Visibility" Value="Collapsed" />
+
                                 <Trigger.EnterActions>
-                                    <BeginStoryboard x:Name="GlowSwoosh">
+                                    <BeginStoryboard>
                                         <Storyboard RepeatBehavior="Forever">
 
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="StretchBar" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)">
@@ -90,6 +104,12 @@
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                             </Trigger>
+
+                            <Trigger Property="IsIndeterminate" Value="False">
+                                <Setter TargetName="IndeterminateRoot" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="DeterminateRoot" Property="Visibility" Value="Visible" />
+                            </Trigger>
+
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -107,20 +127,13 @@
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
 
                 <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-
-                    <Border
-                        Width="60"
-                        Height="60"
-                        Background="#FF1F1F1F"
-                        CornerRadius="12">
-                        <Image
-                            Margin="12"
-                            Source="/3d512.png"
-                            Stretch="Uniform" />
-                    </Border>
-
+                    <Image
+                        Width="40"
+                        Margin="12"
+                        Source="/3d512.png"
+                        Stretch="Uniform" />
                     <TextBlock
-                        Margin="20,0,0,0"
+                        Margin="0,0,0,0"
                         VerticalAlignment="Center"
                         FontSize="32"
                         FontWeight="SemiBold"
@@ -133,8 +146,10 @@
                     Width="200"
                     Height="4"
                     Margin="0,40,0,0"
-                    IsIndeterminate="True"
-                    Style="{StaticResource ModernProgressBar}" />
+                    IsIndeterminate="False"
+                    Style="{StaticResource ModernProgressBar}"
+                    ValueChanged="LoadingBar_ValueChanged"
+                    Value="65" />
 
                 <TextBlock
                     x:Name="LoadingStatus"

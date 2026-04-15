@@ -32,12 +32,10 @@ namespace BVCC
                 if(value == true)
                 {
                     LoadingBar.Visibility = Visibility.Visible;
-                    LoadingStatus.Visibility = Visibility.Visible;
                 }
                 else
                 {
                     LoadingBar.Visibility = Visibility.Collapsed;
-                    LoadingStatus.Visibility = Visibility.Collapsed;
                 }
                 _isupdating = value;
             }
@@ -46,7 +44,6 @@ namespace BVCC
         {
             InitializeComponent();
             LoadingBar.Visibility = Visibility.Collapsed;
-            LoadingStatus.Visibility = Visibility.Collapsed;
         }
     }
 }

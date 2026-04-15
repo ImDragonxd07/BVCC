@@ -458,6 +458,10 @@ namespace BVCC
                 UIHelper.SwipePage(packageManager, true);
 
                 Log("SwipePage");
+                if (App.savedata.OpenUnityAfterProjectCreation)
+                {
+                    App.OpenProject(project);
+                }
             }
             catch (Exception ex)
             {

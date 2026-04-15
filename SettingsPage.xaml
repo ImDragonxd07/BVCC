@@ -23,6 +23,85 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!--  Add to UserControl.Resources  -->
+        <Style x:Key="ToggleSwitch" TargetType="CheckBox">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!--  Text block area (optional, only shows if Content is set)  -->
+                            <ContentPresenter
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+
+                            <!--  Track  -->
+                            <Border
+                                x:Name="Track"
+                                Grid.Column="1"
+                                Width="42"
+                                Height="24"
+                                Background="#FF444444"
+                                CornerRadius="12"
+                                Cursor="Hand">
+
+                                <!--  Thumb  -->
+                                <Ellipse
+                                    x:Name="Thumb"
+                                    Width="18"
+                                    Height="18"
+                                    Margin="3,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    Fill="White" />
+                            </Border>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ThicknessAnimation
+                                                Storyboard.TargetName="Thumb"
+                                                Storyboard.TargetProperty="Margin"
+                                                To="21,0,0,0"
+                                                Duration="0:0:0.2" />
+                                            <ColorAnimation
+                                                Storyboard.TargetName="Track"
+                                                Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                To="#FF0078D4"
+                                                Duration="0:0:0.2" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ThicknessAnimation
+                                                Storyboard.TargetName="Thumb"
+                                                Storyboard.TargetProperty="Margin"
+                                                To="3,0,0,0"
+                                                Duration="0:0:0.2" />
+                                            <ColorAnimation
+                                                Storyboard.TargetName="Track"
+                                                Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                To="#FF444444"
+                                                Duration="0:0:0.2" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="TitleBarButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="White" />
@@ -363,7 +442,120 @@
                                 Style="{StaticResource PillButton}" />
                         </Grid>
                     </Border>
+                    <TextBlock
+                        Margin="0,0,0,10"
+                        FontSize="12"
+                        FontWeight="Bold"
+                        Foreground="#FF0078D4"
+                        Text="USER SETTINGS" />
+                    <Border
+                        Margin="0,0,0,20"
+                        Padding="15"
+                        Background="#FF222222"
+                        CornerRadius="10">
+                        <StackPanel>
 
+                            <!--  Row helper pattern: Grid with label stack + toggle  -->
+                            <Grid Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Check for Updates on Launch" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Automatically check for new BVCC versions when the app starts." />
+                                </StackPanel>
+                                <CheckBox
+                                    x:Name="CheckForUpdatesCheckBox"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="CheckForUpdatesCheckBox_Click"
+                                    IsChecked="True"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Show Pre-release Packages" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Display alpha and beta versions in the package browser." />
+                                </StackPanel>
+                                <CheckBox
+                                    x:Name="ShowPreReleasesCheckBox"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="ShowPreReleasesCheckBox_Click"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>
+
+                            <!--<Grid Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Confirm Before Removing Package" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Show a confirmation dialog before uninstalling packages." />
+                                </StackPanel>
+                                <CheckBox
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    IsChecked="True"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>-->
+
+                            <Grid Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Open Unity After Project Create" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Automatically launch Unity Editor when a new project is created." />
+                                </StackPanel>
+                                <CheckBox
+                                    x:Name="OpenAfterProjectCreateCheckBox"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="OpenAfterProjectCreateCheckBox_Click"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>
+
+                            <!--<Grid>
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Minimize to Tray on Close" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Keep BVCC running in the system tray instead of exiting." />
+                                </StackPanel>
+                                <CheckBox
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>-->
+
+                        </StackPanel>
+                    </Border>
                     <TextBlock
                         Margin="0,0,0,10"
                         FontSize="12"

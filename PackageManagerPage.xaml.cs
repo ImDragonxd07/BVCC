@@ -30,7 +30,10 @@ namespace BVCC
         private string _activeFilter = "All";
         private string _activeSortField = "Status";
         private bool _sortAscending = true;
-
+        private bool _showPreRelease
+        {
+            get { return App.savedata.ShowPreReleases; }
+        }
         private Grid _loadingOverlay;
 
         public PackageManagerPage()
@@ -368,12 +371,10 @@ namespace BVCC
                             var versions = pkgData["versions"] as JObject;
                             if (versions != null)
                             {
-                                package.VersionList = versions.Properties()
-                                    .Select(p => p.Name)
-                                    .OrderByDescending(v => ParseVersion(v))
-                                    .ToList();
+                                package.VersionList = SortVersions(versions.Properties().Select(p => p.Name), ascending: false, includePreRelease: _showPreRelease);
 
-                                package.LatestVersion = package.VersionList.FirstOrDefault();
+
+                                package.LatestVersion = SortVersions(versions.Properties().Select(p => p.Name), ascending: false, includePreRelease: _showPreRelease).FirstOrDefault();
                                 package.Name = versions[package.LatestVersion]?["displayName"]?.ToString()
                                               ?? package.ID;
                             }
@@ -459,10 +460,7 @@ namespace BVCC
                             Name = versions[latestVer]?["displayName"]?.ToString() ?? pkg.Name,
                             IsInstalled = false,
                             LatestVersion = latestVer,
-                            VersionList = versions.Properties()
-                                .Select(p => p.Name)
-                                .OrderByDescending(v => ParseVersion(v))
-                                .ToList(),
+                            VersionList = SortVersions(versions.Properties().Select(p => p.Name), ascending: false, includePreRelease: _showPreRelease),
                             SelectedVersion = latestVer,
                             CurrentVersion = null
                         });
@@ -505,6 +503,7 @@ namespace BVCC
 
         private void ApplyFilter()
         {
+
             string query = SearchBox.Text.ToLower();
 
             IEnumerable<ProjectPackage> filtered = allPackages.Where(p =>
@@ -535,7 +534,8 @@ namespace BVCC
                     ? filtered.OrderBy(p => p.Name)
                     : filtered.OrderByDescending(p => p.Name);
             }
-
+            if (!_showPreRelease)
+                filtered = filtered.Where(p => !IsPreRelease(p.LatestVersion ?? ""));
             PackageListBox.ItemsSource = filtered.ToList();
         }
 
@@ -751,7 +751,28 @@ namespace BVCC
                 }
             }
         }
+        private static readonly System.Text.RegularExpressions.Regex PreReleaseRegex =
+    new System.Text.RegularExpressions.Regex(@"[-+](alpha|beta|rc|pre|preview|exp|experimental)",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
+        private static bool IsPreRelease(string version)
+        {
+            if (string.IsNullOrEmpty(version)) return false;
+            return version.Contains('-') || version.Contains('+') && PreReleaseRegex.IsMatch(version);
+        }
+
+        private List<string> SortVersions(IEnumerable<string> versions, bool ascending = false, bool includePreRelease = true)
+        {
+            var filtered = versions.Where(v => !string.IsNullOrEmpty(v));
+
+            if (!includePreRelease)
+                filtered = filtered.Where(v => !IsPreRelease(v));
+
+            return filtered
+                .OrderBy(v => ascending ? ParseVersion(v) : new Version(0, 0))
+                .ThenByDescending(v => ascending ? new Version(0, 0) : ParseVersion(v))
+                .ToList();
+        }
         private void RemoveProjectBtn_Click(object sender, RoutedEventArgs e)
         {
             if (currentproject == null) return;

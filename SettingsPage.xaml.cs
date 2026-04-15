@@ -31,6 +31,9 @@ namespace BVCC
             UnityEditorPathBox.Text = App.savedata.UnityEditorPath;
             ProjectPathBox.Text = App.savedata.ProjectsFolder;
             LocalRepoPathBox.Text = App.savedata.RepoPath;
+            OpenAfterProjectCreateCheckBox.IsChecked = App.savedata.OpenUnityAfterProjectCreation;
+            ShowPreReleasesCheckBox.IsChecked = App.savedata.ShowPreReleases;
+            CheckForUpdatesCheckBox.IsChecked = App.savedata.CheckForUpdates;
         }
 
         private async void AddRepo_Click(object sender, RoutedEventArgs e)
@@ -402,6 +405,33 @@ namespace BVCC
             {
                 MessageBox.Show($"Failed to clear cache: {ex.Message}");
             }
+        }
+
+        private void OpenAfterProjectCreateCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.savedata == null) return;
+            CheckBox checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+            App.savedata.OpenUnityAfterProjectCreation = checkBox.IsChecked == true;
+            App.SaveToDisk();
+        }
+
+        private void ShowPreReleasesCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.savedata == null) return;
+            CheckBox checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+            App.savedata.ShowPreReleases = checkBox.IsChecked == true;
+            App.SaveToDisk();
+        }
+
+        private void CheckForUpdatesCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.savedata == null) return;
+            CheckBox checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+            App.savedata.CheckForUpdates = checkBox.IsChecked == true;
+            App.SaveToDisk();
         }
     }
 }

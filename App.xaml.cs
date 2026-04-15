@@ -1,5 +1,4 @@
-﻿
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -7,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Management.Instrumentation;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows;
@@ -58,7 +58,6 @@ namespace BVCC
 
         public async Task<dynamic> GetLastestRelease()
         {
-            // Use the general releases list (DO NOT use /latest)
             string url = "https://api.github.com/repos/ImDragonxd07/BVCC/releases";
 
             using (HttpClient client = new HttpClient())
@@ -69,14 +68,10 @@ namespace BVCC
                 {
                     string json = await client.GetStringAsync(url);
                     var serializer = new JavaScriptSerializer();
-
-                    // GitHub returns an array [] of releases
                     var releases = serializer.Deserialize<dynamic[]>(json);
 
                     if (releases != null && releases.Length > 0)
                     {
-                        // The item at [0] is ALWAYS the newest published release
-                        // even if it is a pre-release!
                         return releases[0];
                     }
                 }
@@ -166,7 +161,7 @@ namespace BVCC
             splash.Show();
             splash.LoadingStatus.Text = "INIT";
 
-            if (savedata.CheckForUpdates)
+            if (savedata.CheckForUpdates && !e.Args.Contains("--noupdate"))
             {
                 splash.LoadingStatus.Text = "Checking for updates...";
                 var latest = await GetLastestRelease();
@@ -241,7 +236,11 @@ namespace BVCC
         }
         public static void OpenProjectPath(string path)
         {
-            Process.Start("explorer.exe", path);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true
+            });
         }
     }
 }

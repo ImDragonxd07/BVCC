@@ -57,16 +57,25 @@ namespace BVCC
         private void RefreshRepoList()
         {
             _suppressSelectionChanged = true;
-
-            RepoList.ItemsSource = _filteredPackages
+            var items = _filteredPackages
                 .OrderByDescending(p => _selectedPackageIds.Contains(p.ID))
                 .ThenBy(p => p.Name)
                 .ToList();
-
-            foreach (var item in RepoList.Items.OfType<ProjectPackage>())
+            RepoList.ItemsSource = items;
+            RepoList.SelectedItems.Clear();
+            foreach (var item in items)
             {
                 if (_selectedPackageIds.Contains(item.ID))
                     RepoList.SelectedItems.Add(item);
+            }
+            if(_selectedPackageIds.Count > 0)
+            {
+                BulkActionBar.Visibility = Visibility.Visible;
+                SelectedCountText.Text = $"{_selectedPackageIds.Count} selected";
+            }
+            else
+            {
+                BulkActionBar.Visibility = Visibility.Collapsed;
             }
 
             _suppressSelectionChanged = false;
@@ -240,17 +249,17 @@ namespace BVCC
 
         private void RepoList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_suppressSelectionChanged) return;
+            if (_suppressSelectionChanged)
+                return;
 
             foreach (ProjectPackage p in e.AddedItems.OfType<ProjectPackage>())
                 _selectedPackageIds.Add(p.ID);
+
             foreach (ProjectPackage p in e.RemovedItems.OfType<ProjectPackage>())
                 _selectedPackageIds.Remove(p.ID);
 
-            var count = _selectedPackageIds.Count;
-            BulkActionBar.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            SelectedCountText.Text = $"{count} selected";
-            RefreshRepoList();
+            SelectedCountText.Text = $"{_selectedPackageIds.Count} selected";
+            BulkActionBar.Visibility = _selectedPackageIds.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)
@@ -262,8 +271,7 @@ namespace BVCC
 
         private void DeselectAll_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var p in _filteredPackages)
-                _selectedPackageIds.Remove(p.ID);
+            _selectedPackageIds.ExceptWith(_filteredPackages.Select(p => p.ID));
             RefreshRepoList();
         }
         private async Task SelectTemplate(RepoTemplate template)
@@ -276,7 +284,25 @@ namespace BVCC
             _selectedPackageIds = new HashSet<string>(template.PackageIDs);
             TemplateNameBox.Text = template.Name;
 
+            var validIds = _availablePackages.Select(p => p.ID).ToHashSet();
+
+            var missing = template.PackageIDs
+                .Where(id => !validIds.Contains(id))
+                .ToList();
+
+            _selectedPackageIds = new HashSet<string>(
+                template.PackageIDs.Where(id => validIds.Contains(id)));
+
             RefreshRepoList();
+
+            if (missing.Count > 0)
+            {
+                MessageBox.Show(
+                    $"{missing.Count} packages in {template.Name} are missing from repositories and will be ignored.",
+                    "Warning",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
 
             var count = _selectedPackageIds.Count;
             BulkActionBar.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;

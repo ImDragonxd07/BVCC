@@ -47,6 +47,14 @@ namespace BVCC
             Avatar = 1,
             Other = 2,
         }
+        public class GitHubRelease
+        {
+            public string Version { get; set; }
+            public string DownloadUrl { get; set; }
+            public string Name { get; set; }
+            public bool IsPreRelease { get; set; }
+            public DateTime PublishedAt { get; set; }
+        }
         public class TemplateItem
         {
             public string Name { get; set; }

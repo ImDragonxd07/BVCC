@@ -24,8 +24,27 @@ namespace BVCC
             RefreshPage();
             NameText.Text = App.savedata.AppName;
             VersionText.Text = App.savedata.AppVersion;
+            _ = LoadReleasesAsync();
         }
+        private async Task LoadReleasesAsync()
+        {
+            if (App.GitHubReleases == null || App.GitHubReleases.Count < 1)
+            {
+                App.GitHubReleases = await App.GetAllReleases();
+            }
 
+            AppVersionComboBox.ItemsSource = App.GitHubReleases;
+
+            AppVersionComboBox.SelectionChanged -= AppVersionComboBox_SelectionChanged;
+
+            AppVersionComboBox.SelectedItem = App.GitHubReleases
+                                                    .FirstOrDefault(r =>
+                                                        string.Equals(r.Version?.Trim(),
+                                                                      App.savedata.AppVersion?.Trim(),
+                                                                      StringComparison.OrdinalIgnoreCase));
+
+            AppVersionComboBox.SelectionChanged += AppVersionComboBox_SelectionChanged;
+        }
         private void RefreshPage()
         {
             RepoListBox.ItemsSource = null;
@@ -451,6 +470,31 @@ namespace BVCC
             if (checkBox == null) return;
             App.savedata.CheckForUpdates = checkBox.IsChecked == true;
             App.SaveToDisk();
+        }
+
+
+        private void AppVersionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            GitHubRelease selectedrelease = AppVersionComboBox.SelectedItem as Data.GitHubRelease;
+            if (selectedrelease == null || selectedrelease.Version == App.savedata.AppVersion) return;
+            var result = MessageBox.Show(
+                "Changing your app version may result in instability, missing features, or broken projects. Only proceed if you understand the risks.",
+                "Change app version",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes)
+            {
+                return;
+            }
+            else
+            {
+                Application.Current.MainWindow.Close();
+                App.splash.Show();
+                Application.Current.MainWindow = App.splash;
+                App.savedata.CheckForUpdates = false;
+                App.DownloadAndInstallVersion(selectedrelease);
+            }
         }
     }
 }

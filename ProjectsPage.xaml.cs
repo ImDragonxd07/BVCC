@@ -67,7 +67,6 @@ namespace BVCC
             }
         }
 
-        // EVENTS
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Left) this.DragMove();

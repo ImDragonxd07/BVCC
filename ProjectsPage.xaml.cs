@@ -117,7 +117,7 @@ namespace BVCC
         {
             ProjectItem newitem = GetProjectItemFromPath(path);
             if (App.savedata.Projects.Contains(newitem)) { 
-                System.Windows.MessageBox.Show("Project already exists in the list.", "Import Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                CustomDialog.Show("Project already exists in the list.", "Import Failed", CustomDialog.Mode.Message);
                 return null; }
             App.savedata.Projects.Add(newitem);
             App.SaveToDisk();

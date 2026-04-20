@@ -74,8 +74,8 @@ namespace BVCC
             if (!url.StartsWith("https://"))
                 return;
             var packages = await App.SettingsPage.FetchRepoPackagesAsync(url);
-            var addrepomsg = MessageBox.Show($"Do you want to add {packages.Count} packages?", App.savedata.AppName, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
-            if (addrepomsg == MessageBoxResult.OK)
+            var addrepomsg = (bool)CustomDialog.Show($"Do you want to add {packages.Count} packages?", App.savedata.AppName, CustomDialog.Mode.Question);
+            if (addrepomsg)
             {
                 App.SettingsPage.AddPackages(packages);
             }

@@ -413,6 +413,14 @@
                                         Content="EXPORT"
                                         FontSize="9"
                                         Style="{StaticResource PillButton}" />
+                                    <Button
+                                        Width="70"
+                                        Height="24"
+                                        Background="#FF333333"
+                                        Click="RefetchRepos_Click"
+                                        Content="REFETCH"
+                                        FontSize="9"
+                                        Style="{StaticResource PillButton}" />
                                 </StackPanel>
                             </Grid>
 

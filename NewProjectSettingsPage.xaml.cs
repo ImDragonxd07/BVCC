@@ -17,11 +17,10 @@ namespace BVCC
 {
     public partial class NewProjectSettingsPage : UserControl, INotifyPropertyChanged
     {
-        private static readonly HttpClient client = new HttpClient();
-        private Dictionary<string, JObject> _repoCache = new Dictionary<string, JObject>();
+        public static readonly HttpClient client = new HttpClient();
 
-        private List<ProjectPackage> _availablePackages = new List<ProjectPackage>();
         private List<ProjectPackage> _filteredPackages = new List<ProjectPackage>();
+        private List<ProjectPackage> _availablePackages = new List<ProjectPackage>();
 
         private bool _suppressSelectionChanged = false;
 
@@ -83,54 +82,14 @@ namespace BVCC
 
         private async Task LoadRepositories()
         {
-            _repoCache.Clear();
-            _availablePackages.Clear();
             RepoGhostLoading.Visibility = Visibility.Visible;
             RepoList.Visibility = Visibility.Collapsed;
 
-            foreach (var repo in App.savedata.Repositories)
-            {
-                try
-                {
-                    var json = JObject.Parse(await client.GetStringAsync(repo.Url));
-                    _repoCache[repo.Url] = json;
-                }
-                catch
-                {
-                    // ignore broken repos
-                }
-            }
+            await App.EnsureRepoCacheAsync();
 
-            var list = new List<ProjectPackage>();
+            _availablePackages = App.CachedPackages;
+            _filteredPackages = _availablePackages;
 
-            foreach (var repo in _repoCache.Values)
-            {
-                var packages = repo["packages"] as JObject;
-                if (packages == null) continue;
-
-                foreach (var pkg in packages.Properties())
-                {
-                    var versions = pkg.Value["versions"] as JObject;
-                    if (versions == null) continue;
-
-                    var latest = versions.Properties()
-                        .Select(v => v.Name)
-                        .OrderByDescending(v => v)
-                        .FirstOrDefault();
-
-                    list.Add(new ProjectPackage
-                    {
-                        ID = pkg.Name,
-                        Name = versions[latest]?["displayName"]?.ToString() ?? pkg.Name,
-                        LatestVersion = latest,
-                        SelectedVersion = latest,
-                        IsInstalled = false
-                    });
-                }
-            }
-
-            _availablePackages = list;
-            _filteredPackages = list;
             RepoGhostLoading.Visibility = Visibility.Collapsed;
             RepoList.Visibility = Visibility.Visible;
 
@@ -297,11 +256,10 @@ namespace BVCC
 
             if (missing.Count > 0)
             {
-                MessageBox.Show(
+                CustomDialog.Show(
                     $"{missing.Count} packages in {template.Name} are missing from repositories and will be ignored.",
                     "Warning",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    CustomDialog.Mode.Message);
             }
 
             var count = _selectedPackageIds.Count;
@@ -359,13 +317,12 @@ namespace BVCC
             string destination = projectPath;
             if (Directory.Exists(destination))
             {
-                var result = MessageBox.Show(
+                var result = (bool)CustomDialog.Show(
                     "A project already exists at this location.\nDo you want to overwrite it?",
                     "Confirm Overwrite",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
+                    CustomDialog.Mode.Question);
 
-                if (result != MessageBoxResult.Yes)
+                if (!result)
                 {
                     return;
                 }
@@ -405,7 +362,7 @@ namespace BVCC
                 if (!Directory.Exists(source))
                 {
                     Log("Template missing: " + source);
-                    MessageBox.Show("Template not found.");
+                    CustomDialog.Show("Template not found.", App.savedata.AppName, CustomDialog.Mode.Message);
                     return;
                 }
 
@@ -498,7 +455,7 @@ namespace BVCC
                 }
                 catch { }
 
-                MessageBox.Show("Project creation failed. Check log file.");
+                CustomDialog.Show("Project creation failed. Check log file.", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
         private static string MakeSafeFolderName(string input)

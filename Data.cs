@@ -18,6 +18,7 @@ namespace BVCC
         {
             public string AppName { get; set; } = "BVCC";
             public string AppVersion { get; set; } = "???";
+            public bool SeenReadme { get; set; } = false;
             public bool CheckForUpdates { get; set; } = true;
             public bool ShowPreReleases { get; set; } = true;
             public bool OpenUnityAfterProjectCreation { get; set; } = false;
@@ -52,6 +53,7 @@ namespace BVCC
             public string Version { get; set; }
             public string DownloadUrl { get; set; }
             public string Name { get; set; }
+            public string Description { get; set; }
             public bool IsPreRelease { get; set; }
             public DateTime PublishedAt { get; set; }
         }

@@ -6,14 +6,26 @@ using System.Windows.Media;
 
 namespace BVCC
 {
+    public class ProgressToWidthConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            double value = (double)values[0];
+            double max = (double)values[1];
+            double width = (double)values[2];
+
+            if (max == 0) return 0;
+            return (value / max) * width;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
     public class MultiplierConverter : IMultiValueConverter
     {
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
         {
             if (values.Length < 2) return 0.0;
-
-            // values[0] is the InstallProgress (double 0-1)
-            // values[1] is the ActualWidth of the button
             if (double.TryParse(values[0]?.ToString(), out double progress) &&
                 double.TryParse(values[1]?.ToString(), out double width))
             {

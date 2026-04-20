@@ -76,44 +76,74 @@ namespace BVCC
 
                     if (string.IsNullOrWhiteSpace(jsonString))
                         return new List<RepoItem>();
+                    JObject data = JObject.Parse(jsonString);
 
-                    JObject data;
+                    string repoName = data["name"]?.ToString()
+                                   ?? data["displayName"]?.ToString()
+                                   ?? Path.GetFileNameWithoutExtension(url);
+                    string repoId = data["Id"]?.ToString() ?? data["id"]?.ToString() ?? url;
 
-                    try
+                    return new List<RepoItem>
                     {
-                        data = JObject.Parse(jsonString);
-                    }
-                    catch
-                    {
-                        return new List<RepoItem>();
-                    }
-
-                    JObject packagesObj = data["packages"] as JObject;
-
-                    if (packagesObj == null)
-                        return new List<RepoItem>();
-
-                    var result = new List<RepoItem>();
-
-                    foreach (var pkgProp in packagesObj.Properties())
-                    {
-                        string pkgId = pkgProp.Name;
-
-                        result.Add(new RepoItem
+                        new RepoItem
                         {
                             Url = url,
-                            Id = pkgId,
-                            Name = pkgProp.Value["name"]?.ToString() ?? pkgId
-                        });
-                    }
-
-                    return result;
+                            Id = repoId,
+                            Name = repoName
+                        }
+                    };
                 }
                 catch
                 {
-                    MessageBox.Show("Failed to fetch or parse the repository data. Please check the URL and try again.");
+                    CustomDialog.Show("Failed to fetch or parse the repository data. Please check the URL and try again.", App.savedata.AppName, CustomDialog.Mode.Message);
                     return new List<RepoItem>();
                 }
+            }
+        }
+        private async void RefetchRepos_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            if (btn != null) btn.IsEnabled = false;
+
+            try
+            {
+                var cleanList = App.savedata.Repositories
+                    .GroupBy(r => r.Url.Trim().ToLower())
+                    .Select(g => g.First())
+                    .ToList();
+
+                App.savedata.Repositories.Clear();
+                foreach (var repo in cleanList)
+                {
+                    App.savedata.Repositories.Add(repo);
+                }
+                App.RepoCache.Clear();
+                App.CachedPackages.Clear();
+
+                foreach (var repo in App.savedata.Repositories)
+                {
+                    var freshDataList = await FetchRepoPackagesAsync(repo.Url);
+                    var freshRepo = freshDataList.FirstOrDefault();
+
+                    if (freshRepo != null)
+                    {
+                        repo.Name = freshRepo.Name;
+                        repo.Id = freshRepo.Id;
+                    }
+                }
+                await App.EnsureRepoCacheAsync(true);
+                RefreshPage();
+                App.SaveToDisk();
+                CustomDialog.Show("Repositories cleaned and updated.",
+                                  App.savedata.AppName, CustomDialog.Mode.Message);
+            }
+            catch (Exception ex)
+            {
+                CustomDialog.Show($"Update failed: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
+            }
+            finally
+            {
+                if (btn != null) btn.IsEnabled = true;
             }
         }
         public void AddPackages(List<RepoItem> packages)
@@ -145,13 +175,13 @@ namespace BVCC
             {
                 var packages = await FetchRepoPackagesAsync(url);
                 AddPackages(packages);
-                MessageBox.Show($"Added {packages.Count} packages from listing.");
+                CustomDialog.Show($"Added {packages.Count} packages from listing.", App.savedata.AppName, CustomDialog.Mode.Message);
                 RepoUrlInput.Text = "";
                 return;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to load:\n{ex.Message}");
+                CustomDialog.Show($"Failed to load:\n{ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
         private void RemoveRepo_Click(object sender, RoutedEventArgs e)
@@ -229,7 +259,7 @@ namespace BVCC
                 App.ProjectsPage.RefreshProjects();
                 RefreshPage();
                 App.SaveToDisk();
-                System.Windows.MessageBox.Show("VCC Data Imported Successfully!");
+                CustomDialog.Show("VCC Data Imported Successfully!", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
 
@@ -291,9 +321,9 @@ namespace BVCC
 
         public void ResetDataBtn_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show("Are you sure you want to reset all data? This cannot be undone.",
-                                 "Confirm Reset", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (result == MessageBoxResult.Yes)
+            var result = (bool)CustomDialog.Show("Are you sure you want to reset all data? This cannot be undone.",
+                                 App.savedata.AppName, CustomDialog.Mode.Question);
+            if (result)
             {
                 File.Delete("Settings.json");
                 Process.Start(Process.GetCurrentProcess().MainModule.FileName);
@@ -324,11 +354,11 @@ namespace BVCC
                 var json = JsonConvert.SerializeObject(exportObj, Formatting.Indented);
                 File.WriteAllText(dialog.FileName, json);
 
-                MessageBox.Show("Repositories exported successfully.");
+                CustomDialog.Show("Repositories exported successfully.", App.savedata.AppName, CustomDialog.Mode.Message);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Export failed:\n{ex.Message}");
+                CustomDialog.Show($"Export failed:\n{ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
 
@@ -372,7 +402,7 @@ namespace BVCC
 
                 if (reposToken == null)
                 {
-                    MessageBox.Show("Invalid repo file.");
+                    CustomDialog.Show("Invalid repo file.", App.savedata.AppName, CustomDialog.Mode.Message);
                     return;
                 }
 
@@ -402,11 +432,11 @@ namespace BVCC
                 //App.PackageManagerPage?.ClearRepoCache();
                 RefreshPage();
 
-                MessageBox.Show($"Imported {added} repositories.");
+                CustomDialog.Show($"Imported {added} repositories.", App.savedata.AppName, CustomDialog.Mode.Message);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Import failed:\n{ex.Message}");
+                CustomDialog.Show($"Import failed:\n{ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
 
@@ -420,7 +450,7 @@ namespace BVCC
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to open data folder: {ex.Message}");
+                CustomDialog.Show($"Failed to open data folder: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
 
@@ -437,11 +467,11 @@ namespace BVCC
                 {
                     Directory.Delete(dir, true);
                 }
-                MessageBox.Show("Cache cleared.");
+                CustomDialog.Show("Cache cleared.", App.savedata.AppName, CustomDialog.Mode.Message);
             }
             catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to clear cache: {ex.Message}");
+            {   
+                CustomDialog.Show($"Failed to clear cache: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
 
@@ -477,13 +507,11 @@ namespace BVCC
         {
             GitHubRelease selectedrelease = AppVersionComboBox.SelectedItem as Data.GitHubRelease;
             if (selectedrelease == null || selectedrelease.Version == App.savedata.AppVersion) return;
-            var result = MessageBox.Show(
+            var result = (bool)CustomDialog.Show(
                 "Changing your app version may result in instability, missing features, or broken projects. Only proceed if you understand the risks.",
                 "Change app version",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes)
+                CustomDialog.Mode.Question);
+            if (!result)
             {
                 return;
             }
@@ -493,6 +521,7 @@ namespace BVCC
                 App.splash.Show();
                 Application.Current.MainWindow = App.splash;
                 App.savedata.CheckForUpdates = false;
+                App.savedata.SeenReadme = false;
                 App.DownloadAndInstallVersion(selectedrelease);
             }
         }

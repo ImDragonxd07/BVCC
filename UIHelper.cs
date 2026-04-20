@@ -29,6 +29,10 @@ namespace BVCC
                         title = "NEW PROJECT FROM TEMPLATE";
                         break;
 
+                    case var x when x == typeof(NewProjectSettingsPage):
+                        title = "CREATE NEW PROJECT";
+                        break;
+
                     default:
                         title = "PROJECTS";
                         break;

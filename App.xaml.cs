@@ -61,6 +61,8 @@ namespace BVCC
         }
         public static async Task<List<GitHubRelease>> GetAllReleases()
         {
+
+
             string url = "https://api.github.com/repos/ImDragonxd07/BVCC/releases";
 
             using (var client = new HttpClient())
@@ -82,6 +84,7 @@ namespace BVCC
                         string version = release["tag_name"]?.ToString();
                         string name = release["name"]?.ToString();
                         bool prerelease = release["prerelease"]?.ToObject<bool>() ?? false;
+                        string description = release["body"]?.ToString();
 
                         string downloadUrl =
                             release["assets"]?[0]?["browser_download_url"]?.ToString();
@@ -91,6 +94,7 @@ namespace BVCC
                             Version = version,
                             Name = name,
                             DownloadUrl = downloadUrl,
+                            Description = description,
                             IsPreRelease = prerelease,
                             PublishedAt = DateTime.Parse(release["published_at"]?.ToString())
                         });
@@ -105,33 +109,68 @@ namespace BVCC
                 }
             }
         }
-      
-        private const string PipeName = "BVCC_PIPE";
-
-        private async Task StartPipeServer()
+        private bool _ownsMutex = false;
+        protected override void OnExit(ExitEventArgs e)
         {
-            while (true)
-            {
-                using (var server = new NamedPipeServerStream(
-                    PipeName,
-                    PipeDirection.In,
-                    1,
-                    PipeTransmissionMode.Message,
-                    PipeOptions.Asynchronous))
-                {
-                    await server.WaitForConnectionAsync();
+            _pipeCts?.Cancel();
 
-                    using (var reader = new StreamReader(server))
+            if (_ownsMutex && _mutex != null)
+            {
+                try
+                {
+                    _mutex.ReleaseMutex();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Mutex release error: {ex.Message}");
+                }
+                finally
+                {
+                    _mutex.Dispose();
+                }
+            }
+
+            base.OnExit(e);
+        }
+
+        private const string PipeName = "BVCC_PIPE";
+        private static CancellationTokenSource _pipeCts = new CancellationTokenSource();
+        private async Task StartPipeServer(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    using (var server = new NamedPipeServerStream(
+                        PipeName,
+                        PipeDirection.In,
+                        1,
+                        PipeTransmissionMode.Message,
+                        PipeOptions.Asynchronous))
                     {
-                        string message = await reader.ReadLineAsync();
-                        if (!string.IsNullOrWhiteSpace(message))
+                        await server.WaitForConnectionAsync(token);
+
+                        using (var reader = new StreamReader(server))
                         {
-                            Application.Current.Dispatcher.Invoke(async () =>
+                            string message = await reader.ReadLineAsync();
+                            if (!string.IsNullOrWhiteSpace(message))
                             {
-                                await ProtocolRouter.HandleAsync(message);
-                            });
+                                Application.Current.Dispatcher.Invoke(() =>
+                                {
+                                    _ = ProtocolRouter.HandleAsync(message);
+                                });
+                            }
                         }
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Pipe Server Error: {ex.Message}");
+                    await Task.Delay(1000, token);
                 }
             }
         }
@@ -203,18 +242,117 @@ namespace BVCC
         }
 
         private Mutex _mutex;
+        public static Dictionary<string, JObject> RepoCache { get; } = new Dictionary<string, JObject>();
+        public static List<ProjectPackage> CachedPackages { get; set; } = new List<ProjectPackage>();
+        private static readonly HttpClient client = new HttpClient();
 
+        public static async Task EnsureRepoCacheAsync(bool forceRefresh = false)
+        {
+            var toFetch = forceRefresh
+                ? savedata.Repositories.ToList()
+                : savedata.Repositories.Where(r => !RepoCache.ContainsKey(r.Url)).ToList();
+
+            bool hasSplash = splash != null;
+
+            if (hasSplash)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    splash.LoadingBar.IsIndeterminate = false;
+                    splash.LoadingBar.Value = 0;
+                });
+            }
+
+            int loaded = 0;
+            int total = toFetch.Count;
+
+            foreach (var repo in toFetch)
+            {
+                try
+                {
+                    var json = JObject.Parse(await client.GetStringAsync(repo.Url));
+                    lock (RepoCache)
+                    {
+                        RepoCache[repo.Url] = json;
+                    }
+                }
+                catch { }
+
+                loaded++;
+
+                if (hasSplash)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        splash.LoadingStatus.Text = $"Loading Repositories... ({loaded}/{total})";
+                        splash.LoadingBar.Value = ((double)loaded / total) * 100;
+                    });
+                }
+            }
+
+            var validUrls = savedata.Repositories.Select(r => r.Url).ToHashSet();
+            foreach (var key in RepoCache.Keys.Where(k => !validUrls.Contains(k)).ToList())
+                RepoCache.Remove(key);
+
+            var list = new List<ProjectPackage>();
+            foreach (var repo in RepoCache.Values)
+            {
+                var packages = repo["packages"] as JObject;
+                if (packages == null) continue;
+
+                foreach (var pkg in packages.Properties())
+                {
+                    var versions = pkg.Value["versions"] as JObject;
+                    if (versions == null) continue;
+
+                    var latest = versions.Properties()
+                        .OrderByDescending(v => v.Name)
+                        .FirstOrDefault();
+
+                    if (latest == null) continue;
+
+                    string displayName = latest.Value["displayName"]?.ToString()
+                        ?? latest.Value["name"]?.ToString()
+                        ?? pkg.Name;
+
+                    list.Add(new ProjectPackage
+                    {
+                        ID = pkg.Name,
+                        Name = displayName,
+                        LatestVersion = latest.Name,
+                        SelectedVersion = latest.Name,
+                        IsInstalled = false
+                    });
+                }
+            }
+
+            CachedPackages = list;
+
+            if (hasSplash)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    splash.LoadingBar.IsIndeterminate = true;
+                });
+            }
+        }
+        private async Task<GitHubRelease> GetLatestGithubRelease()
+        {
+            GitHubReleases = await GetAllReleases();
+            return GitHubReleases
+                .OrderByDescending(r => r.PublishedAt)
+                .FirstOrDefault();
+        }
         private async Task OnStartupAsync(StartupEventArgs e)
         {
             //MessageBox.Show(string.Join("\n", e.Args));
-            bool createdNew;
-            _mutex = new Mutex(true, @"Global\BVCC_MUTEX", out createdNew);
+            _mutex = new Mutex(true, @"Global\BVCC_MUTEX", out _ownsMutex);
             string pendingProtocol = null;
             var argsList = e.Args.ToList();
-            pendingProtocol = argsList.FirstOrDefault(a => a.StartsWith("bvcc://"));
-            if (!createdNew)
+            if (!_ownsMutex)
             {
-                if (e.Args.Length > 0)
+                pendingProtocol = e.Args.FirstOrDefault(a => a.StartsWith("bvcc://"));
+                if (!string.IsNullOrWhiteSpace(pendingProtocol))
                 {
                     await SendToRunningInstance(pendingProtocol);
                 }
@@ -222,8 +360,7 @@ namespace BVCC
                 Shutdown();
                 return;
             }
-            _ = Task.Run(StartPipeServer);
-
+            _ = Task.Run(() => StartPipeServer(_pipeCts.Token));
             base.OnStartup(e);
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
@@ -262,7 +399,8 @@ namespace BVCC
             if (new FileInfo(settingsPath).Length == 0)
             {
                 SaveToDisk();
-                MessageBox.Show("You can import VCC data from the Settings menu", "Welcome to BVCC");
+                CustomDialog.Show("You can import VCC data from the Settings menu", "Welcome to BVCC", CustomDialog.Mode.Message);
+
             }
 
             savedata = JsonConvert.DeserializeObject<SaveData>(File.ReadAllText(settingsPath));
@@ -277,10 +415,10 @@ namespace BVCC
             if (!Directory.Exists(templatesDir) ||
                 !Directory.EnumerateFiles(templatesDir, "*", SearchOption.AllDirectories).Any())
             {
-                MessageBox.Show(
-                    "No templates found! Please add some to the Templates folder and restart the app if you want to use them.",
-                    "No Templates Detected");
-            }else
+
+                CustomDialog.Show("No templates found! Please add some to the Templates folder and restart the app if you want to use them.", "No Templates Detected", CustomDialog.Mode.Message);
+            }
+            else
             {
                 TemplatesInsalled = true;
             }
@@ -300,29 +438,26 @@ namespace BVCC
             splash = new SplashScreen();
             splash.Show();
             splash.LoadingStatus.Text = "INIT";
-
-            if (savedata.CheckForUpdates && !argsList.Contains("--noupdate"))
+            bool skipupdate = argsList.Contains("--noupdate");
+            if (savedata.CheckForUpdates && !skipupdate)
             {
                 splash.LoadingStatus.Text = "Checking for updates...";
-                GitHubReleases = await GetAllReleases();
-                var latest = GitHubReleases
-                    .OrderByDescending(r => r.PublishedAt)
-                    .FirstOrDefault();
+                GitHubRelease latest = await GetLatestGithubRelease();
                 if (latest != null)
                 {
                     string newestVersion = latest.Version;
                     string myCurrentVersion = savedata.AppVersion;
                     if (newestVersion != myCurrentVersion)
                     {
-                        DownloadAndInstallVersion(latest);
+                        await DownloadAndInstallVersion(latest);
                     }
                 }
             }
             splash.LoadingStatus.Text = "Initializing";
-            SaveToDisk();
             ProjectsPage = new ProjectsPage();
             SettingsPage = new SettingsPage();
             NewFromTemplatePage = new NewFromTemplate();
+            await EnsureRepoCacheAsync();
             splash.LoadingStatus.Text = "Register";
             if (!ProtocolInstaller.IsRegistered())
             {
@@ -336,6 +471,13 @@ namespace BVCC
             splash.Hide();
             Application.Current.MainWindow = ProjectsPage;
             ProjectsPage.Show();
+            if (!savedata.SeenReadme && !skipupdate)
+            {
+                GitHubRelease readmedata = await GetLatestGithubRelease();
+                CustomDialog.Show(readmedata.Description, $"BVCC Updated to {readmedata.Version}", CustomDialog.Mode.Readme);
+                App.savedata.SeenReadme = true;
+            }
+            SaveToDisk();
         }
         private static readonly string settingsPath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.json");

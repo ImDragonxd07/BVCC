@@ -10,6 +10,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
@@ -30,7 +31,14 @@ namespace BVCC
             if (LoadingBar.Template.FindName("ProgressFill", LoadingBar) is FrameworkElement fill)
             {
                 double percent = LoadingBar.Value / LoadingBar.Maximum;
-                fill.Width = percent * LoadingBar.ActualWidth;
+                double targetWidth = percent * LoadingBar.ActualWidth;
+                DoubleAnimation animation = new DoubleAnimation
+                {
+                    To = targetWidth,
+                    Duration = TimeSpan.FromMilliseconds(200),
+                    EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseInOut }
+                };
+                fill.BeginAnimation(FrameworkElement.WidthProperty, animation);
             }
         }
     }

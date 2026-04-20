@@ -7,6 +7,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.ConstrainedExecution;
+using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -22,8 +24,6 @@ namespace BVCC
         private ProjectItem currentproject;
         private List<ProjectPackage> allPackages = new List<ProjectPackage>();
         private static readonly HttpClient client = new HttpClient();
-        private Dictionary<string, (JObject data, DateTime fetchedAt)> _repoCache = new Dictionary<string, (JObject data, DateTime fetchedAt)>();
-        private static readonly TimeSpan CacheExpiry = TimeSpan.FromHours(1);
         private bool _isBulkOperation = false;
         private SemaphoreSlim _installLock = new SemaphoreSlim(1, 1);
 
@@ -44,7 +44,8 @@ namespace BVCC
         }
         public void ClearRepoCache()
         {
-            _repoCache.Clear();
+            App.RepoCache.Clear();
+            App.CachedPackages.Clear();
         }
         private static Version ParseVersion(string v)
         {
@@ -118,20 +119,20 @@ namespace BVCC
             long minSpace = 100L * 1024L * 1024L;
             if (drive.AvailableFreeSpace < minSpace)
             {
-                var lowdiskspacemsg= MessageBox.Show("Low Disk Space, Installing now could lead to a corrupted manifest file", App.savedata.AppName, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
-                if(lowdiskspacemsg == MessageBoxResult.Cancel)
+
+                if((bool)!CustomDialog.Show("Low Disk Space, Installing now could lead to a corrupted manifest file, continue?", App.savedata.AppName, CustomDialog.Mode.Question))
                 {
                     return;
                 }
             }
             if (!HasWriteAccess(packagesPath))
             {
-                MessageBox.Show("Permission Denied: Cannot write to the Packages folder. Is the project in a protected directory?", App.savedata.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+                CustomDialog.Show("Permission Denied: Cannot write to the Packages folder. Is the project in a protected directory?", App.savedata.AppName, CustomDialog.Mode.Message);
                 return;
             }
             if (IsFileLocked(new FileInfo(manifestPath)))
             {
-                MessageBox.Show("Manifest is locked: Is another process using it?", App.savedata.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+                CustomDialog.Show("Manifest is locked: Is another process using it?", App.savedata.AppName, CustomDialog.Mode.Message);
                 return;
             }
             lock (_installingLock)
@@ -162,9 +163,9 @@ namespace BVCC
 
                 string downloadUrl = null;
 
-                foreach (var entry in _repoCache.Values)
+                foreach (var entry in App.RepoCache.Values)
                 {
-                    var versionData = entry.data["packages"]?[package.ID]?["versions"]?[version];
+                    var versionData = entry["packages"]?[package.ID]?["versions"]?[version];
                     if (versionData != null)
                     {
                         downloadUrl = versionData["url"]?.ToString();
@@ -340,9 +341,9 @@ namespace BVCC
 
             string latest = null;
 
-            foreach (var entry in _repoCache.Values)
+            foreach (var entry in App.RepoCache.Values)
             {
-                var pkgData = entry.data["packages"]?[package.ID];
+                var pkgData = entry["packages"]?[package.ID];
                 var versions = pkgData?["versions"] as JObject;
                 if (versions == null) continue;
 
@@ -369,30 +370,9 @@ namespace BVCC
 
             try
             {
-
                 var (finalList, unityVersion) = await Task.Run(async () =>
                 {
-
-                    bool needsFetch = _repoCache.Count == 0 ||
-                                      _repoCache.Values.Any(e => DateTime.Now - e.fetchedAt > CacheExpiry);
-
-                    if (needsFetch)
-                    {
-
-                        foreach (var repo in App.savedata.Repositories.ToList())
-                        {
-                            try
-                            {
-                                var data = JObject.Parse(await client.GetStringAsync(repo.Url));
-                                lock (_repoCache)
-
-                                {
-                                    _repoCache[repo.Url] = (data, DateTime.Now);
-                                }
-                            }
-                            catch { }
-                        }
-                    }
+                    await App.EnsureRepoCacheAsync();
 
                     string manifestPath = Path.Combine(project.ProjectPath, "Packages", "vpm-manifest.json");
                     string unityPath = Path.Combine(project.ProjectPath, "ProjectSettings", "ProjectVersion.txt");
@@ -427,9 +407,9 @@ namespace BVCC
                                 VersionList = new List<string>()
                             };
 
-                            foreach (var entry in _repoCache.Values)
+                            foreach (var entry in App.RepoCache.Values)
                             {
-                                var pkgData = entry.data["packages"]?[package.ID];
+                                var pkgData = entry["packages"]?[package.ID];
                                 if (pkgData != null)
                                 {
                                     var versions = pkgData["versions"] as JObject;
@@ -490,9 +470,9 @@ namespace BVCC
                     }
 
                     var availableList = new List<ProjectPackage>();
-                    foreach (var entry in _repoCache.Values)
+                    foreach (var entry in App.RepoCache.Values)
                     {
-                        var repoPackages = entry.data["packages"] as JObject;
+                        var repoPackages = entry["packages"] as JObject;
                         if (repoPackages == null) continue;
 
                         foreach (var pkg in repoPackages.Properties())
@@ -554,7 +534,6 @@ namespace BVCC
             }
             catch (Exception ex)
             {
-
                 System.Diagnostics.Debug.WriteLine($"LoadProject Error: {ex.Message}");
             }
             finally
@@ -661,12 +640,16 @@ namespace BVCC
             }
         }
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
-        public async void RefreshBtn_Click(object sender, RoutedEventArgs e) { _repoCache.Clear(); await LoadProject(currentproject); }
         private void BackBtn_Click(object sender, RoutedEventArgs e) => UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
         private void LaunchProjectBtn_Click(object sender, RoutedEventArgs e) { if (currentproject != null) App.OpenProject(currentproject); }
         private void OpenFilePath_Click(object sender, RoutedEventArgs e) => App.OpenProjectPath(currentproject.ProjectPath);
         private void InstallPackage_Click(object sender, RoutedEventArgs e) { if (((Button)sender).DataContext is ProjectPackage p) _ = InstallOrUpdatePackage(p, p.SelectedVersion); }
-
+        public async void RefreshBtn_Click(object sender, RoutedEventArgs e)
+        {
+            App.RepoCache.Clear();
+            App.CachedPackages.Clear();
+            await LoadProject(currentproject);
+        }
         private async void PackageUpdate_Click(object sender, RoutedEventArgs e)
         {
             if (((Button)sender).DataContext is ProjectPackage p)
@@ -678,7 +661,7 @@ namespace BVCC
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to update: {ex.Message}");
+                    CustomDialog.Show($"Failed to update: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
                 }
             }
         }
@@ -686,7 +669,7 @@ namespace BVCC
         private async void RemovePackage_Click(object sender, RoutedEventArgs e)
         {
             if (((Button)sender).DataContext is ProjectPackage p &&
-                MessageBox.Show($"Remove {p.ID}?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                (bool)CustomDialog.Show($"Remove {p.ID}?", App.savedata.AppName, CustomDialog.Mode.Question))
             {
                 p.CurrentAction = PackageAction.Removing;
                 p.ProgressingControl = "Remove";
@@ -706,7 +689,7 @@ namespace BVCC
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error removing package: {ex.Message}");
+                    CustomDialog.Show($"Error removing package: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
                 }
                 finally
                 {
@@ -732,6 +715,7 @@ namespace BVCC
 
             int completed = 0;
             int total = targets.Count;
+            BulkProgressText.Text = $"{label} 0 / {total}";
 
             int maxParallel = 3;
             var semaphore = new SemaphoreSlim(maxParallel);
@@ -776,6 +760,7 @@ namespace BVCC
 
         private async void UpdateAll_Click(object sender, RoutedEventArgs e)
         {
+            
             var targets = allPackages
                 .Where(p => p.IsInstalled && p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion))
                 .Select(p => (p, p.LatestVersion))
@@ -799,7 +784,7 @@ namespace BVCC
                 string ver = cb.SelectedItem as string;
                 if (!string.IsNullOrEmpty(ver) && ver != p.CurrentVersion)
                 {
-                    if (MessageBox.Show($"Change {p.ID} to {ver}?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                    if ((bool)CustomDialog.Show($"Change {p.ID} to {ver}?", "Confirm", CustomDialog.Mode.Question))
                     {
                         p.CurrentAction = PackageAction.ChangingVersion;
                         _ = InstallOrUpdatePackage(p, ver);
@@ -838,7 +823,7 @@ namespace BVCC
         private void RemoveProjectBtn_Click(object sender, RoutedEventArgs e)
         {
             if (currentproject == null) return;
-            if (MessageBox.Show($"Remove {currentproject.ProjectName} from BVCC?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if ((bool)CustomDialog.Show($"Remove {currentproject.ProjectName} from BVCC?", "Confirm", CustomDialog.Mode.Question))
             {
                 App.savedata.Projects.Remove(currentproject);
                 App.SaveToDisk();

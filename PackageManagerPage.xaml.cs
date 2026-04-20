@@ -113,6 +113,7 @@ namespace BVCC
         {
             if (package == null) return;
             if (string.IsNullOrEmpty(version)) return;
+            currentproject.LastModified = DateTime.Now;
             string packagesPath = Path.Combine(currentproject.ProjectPath, "Packages");
             string manifestPath = Path.Combine(packagesPath, "vpm-manifest.json");
             DriveInfo drive = new DriveInfo(Path.GetPathRoot(currentproject.ProjectPath));
@@ -257,6 +258,7 @@ namespace BVCC
             {
                 await InstallOrUpdatePackage(dep.pkg, dep.ver, force: true);
             }
+            
         }
         private async Task UpdateManifest(string id, string version, bool isRemoval = false)
         {

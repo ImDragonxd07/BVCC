@@ -196,71 +196,83 @@ namespace BVCC
 
         private void ImportVCC_Click(object sender, RoutedEventArgs e)
         {
+            string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VRChatCreatorCompanion", "Settings.json");    
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Filter = "Json files (*.json)|*.json|All files (*.*)|*.*",
-                InitialDirectory = Environment.ExpandEnvironmentVariables(@"%LocalAppData%\VRChatCreatorCompanion")
+                InitialDirectory = Environment.ExpandEnvironmentVariables(@"%LocalAppData%\VRChatCreatorCompanion"),
+                Title = "Select VCC Data File",
+                FileName = "Settings.json"
             };
-
-            if (openFileDialog.ShowDialog() == true)
+            bool usedefaultpath = (bool)CustomDialog.Show("Use default path?", App.savedata.AppName, CustomDialog.Mode.Question);
+            if (!usedefaultpath || !File.Exists(defaultPath))
             {
-                string data = File.ReadAllText(openFileDialog.FileName);
-                JObject vccdata = JObject.Parse(data);
-                var projects = vccdata["userProjects"].ToArray();
-                int i = projects.Length;
-                foreach (string property in projects)
+                openFileDialog.ShowDialog();
+                defaultPath = openFileDialog.FileName;
+            }
+            string data = File.ReadAllText(defaultPath);
+            JObject vccdata = JObject.Parse(data);
+            if (vccdata["userProjects"] == null || vccdata["userRepos"] == null)
+            {
+                CustomDialog.Show("Invalid VCC data file.", App.savedata.AppName, CustomDialog.Mode.Message);
+                return;
+            }
+            var projects = vccdata["userProjects"].ToArray();
+            int i = projects.Length;
+            foreach (string property in projects)
+            {
+                App.savedata.Projects.Add(new ProjectItem
                 {
-                    App.savedata.Projects.Add(new ProjectItem
-                    {
-                        ProjectName = Path.GetFileName(property),
-                        ProjectPath = property,
-                        LastModified = new DateTime(i),
-                    });
-                    i--;
-                }
-                var editors = vccdata["preferredUnityEditors"] as JObject;
-                if (editors != null && editors.HasValues)
+                    ProjectName = Path.GetFileName(property),
+                    ProjectPath = property,
+                    LastModified = new DateTime(i),
+                });
+                i--;
+            }
+            var editors = vccdata["preferredUnityEditors"] as JObject;
+            if (editors != null && editors.HasValues)
+            {
+                App.savedata.UnityEditorPath = editors.Properties().First().Value.ToString();
+            }
+            var defPath = vccdata["defaultProjectPath"]?.ToString();
+            if (!string.IsNullOrEmpty(defPath)) App.savedata.ProjectsFolder = defPath;
+            var userRepos = vccdata["userRepos"] as JArray;
+            if (userRepos != null)
+            {
+                foreach (var repo in userRepos)
                 {
-                    App.savedata.UnityEditorPath = editors.Properties().First().Value.ToString();
-                }
-                var defPath = vccdata["defaultProjectPath"]?.ToString();
-                if (!string.IsNullOrEmpty(defPath)) App.savedata.ProjectsFolder = defPath;
-                var userRepos = vccdata["userRepos"] as JArray;
-                if (userRepos != null)
-                {
-                    foreach (var repo in userRepos)
-                    {
-                        string rUrl = repo["url"]?.ToString();
-                        if (string.IsNullOrEmpty(rUrl)) continue;
+                    string rUrl = repo["url"]?.ToString();
+                    if (string.IsNullOrEmpty(rUrl)) continue;
 
-                        string rId =
-                            repo["id"]?.ToString() ??
-                            rUrl;
 
-                        if (!App.savedata.Repositories.Any(r =>
-                            string.Equals(r.Url, rUrl, StringComparison.OrdinalIgnoreCase)))
+                    string repoName = repo["name"]?.ToString()
+                       ?? repo["displayName"]?.ToString()
+                       ?? Path.GetFileNameWithoutExtension(rUrl);
+                    string repoId = repo["Id"]?.ToString() ?? repo["id"]?.ToString() ?? rUrl;
+
+                    if (!App.savedata.Repositories.Any(r =>
+                        string.Equals(r.Url, rUrl, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        App.savedata.Repositories.Add(new RepoItem
                         {
-                            App.savedata.Repositories.Add(new RepoItem
-                            {
-                                Url = rUrl,
-                                Name = repo["name"]?.ToString() ?? "Imported Repo",
-                                Id = rId,
-                                LocalPath = repo["localPath"]?.ToString()
-                            });
-                        }
+                            Url = rUrl,
+                            Name = repoName,
+                            Id = repoId,
+                            LocalPath = repo["localPath"]?.ToString()
+                        });
                     }
                 }
-                App.savedata.Repositories.Add(new RepoItem
-                {
-                    Url = "https://vrchat.github.io/packages/index.json",
-                    Name = "VRChat Official",
-                    Id = "com.vrchat.repos.official"
-                });
-                App.ProjectsPage.RefreshProjects();
-                RefreshPage();
-                App.SaveToDisk();
-                CustomDialog.Show("VCC Data Imported Successfully!", App.savedata.AppName, CustomDialog.Mode.Message);
             }
+            App.savedata.Repositories.Add(new RepoItem
+            {
+                Url = "https://vrchat.github.io/packages/index.json",
+                Name = "VRChat Official",
+                Id = "com.vrchat.repos.official"
+            });
+            App.ProjectsPage.RefreshProjects();
+            RefreshPage();
+            App.SaveToDisk();
+            CustomDialog.Show("VCC Data Imported Successfully!", App.savedata.AppName, CustomDialog.Mode.Message);
         }
 
         private void UnityEditorPathButton_Click(object sender, RoutedEventArgs e)

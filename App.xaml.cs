@@ -130,7 +130,7 @@ namespace BVCC
                 }
             }
 
-            base.OnExit(e);
+            Environment.Exit(0);
         }
 
         private const string PipeName = "BVCC_PIPE";
@@ -336,6 +336,7 @@ namespace BVCC
                 });
             }
         }
+
         private async Task<GitHubRelease> GetLatestGithubRelease()
         {
             GitHubReleases = await GetAllReleases();

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Web.UI;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -15,7 +16,7 @@ using static BVCC.Data;
 
 namespace BVCC
 {
-    public partial class NewProjectSettingsPage : UserControl, INotifyPropertyChanged
+    public partial class NewProjectSettingsPage : System.Windows.Controls.UserControl, INotifyPropertyChanged
     {
         public static readonly HttpClient client = new HttpClient();
 
@@ -28,7 +29,7 @@ namespace BVCC
         private Task _loadTask;
 
         public event PropertyChangedEventHandler PropertyChanged;
-
+        private string projectpath;
         private double _createProgress;
         private HashSet<string> _selectedPackageIds = new HashSet<string>();
 
@@ -94,6 +95,10 @@ namespace BVCC
             RepoList.Visibility = Visibility.Visible;
 
             RefreshRepoList();
+            ProjectPathBox.Text = System.IO.Path.Combine(
+               projectpath,
+               MakeSafeFolderName(ProjectNameBox.Text)
+           );
         }
 
         private void refreshselector()
@@ -108,12 +113,9 @@ namespace BVCC
             CreateBtn.Visibility = Visibility.Collapsed;
 
             HeaderText.Text = template.Name;
-
             ProjectNameBox.Text = template.Name;
-            ProjectPathBox.Text = System.IO.Path.Combine(
-                App.savedata.ProjectsFolder,
-                template.Name
-            );
+            projectpath = App.savedata.ProjectsFolder;
+
             _loadTask = LoadRepositories();
             await _loadTask;
             refreshselector();
@@ -189,8 +191,13 @@ namespace BVCC
         private void BrowseProjectPath_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new System.Windows.Forms.FolderBrowserDialog();
+            dialog.SelectedPath = projectpath;
+
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                ProjectPathBox.Text = dialog.SelectedPath;
+            {
+                projectpath = dialog.SelectedPath;
+                ProjectNameBox_TextChanged(null, null);
+            }
         }
 
         private void RepoSearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -477,15 +484,12 @@ namespace BVCC
         }
         private void ProjectNameBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(ProjectNameBox.Text))
+            if (ProjectNameBox == null || ProjectPathBox == null || string.IsNullOrEmpty(projectpath))
                 return;
-
             var name = ProjectNameBox.Text.Trim();
             HeaderText.Text = name;
-            ProjectPathBox.Text = System.IO.Path.Combine(
-                App.savedata.ProjectsFolder,
-                MakeSafeFolderName(name)
-            );
+            string safeName = MakeSafeFolderName(name);
+            ProjectPathBox.Text = System.IO.Path.Combine(projectpath, safeName);
         }
 
     }

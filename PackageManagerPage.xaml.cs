@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
+using System.IO.Packaging;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.ConstrainedExecution;
@@ -175,8 +176,10 @@ namespace BVCC
                 }
 
                 if (string.IsNullOrEmpty(downloadUrl))
-                    throw new Exception($"Missing URL for {package.ID}");
-
+                {
+                    CustomDialog.Show("Download URL not found for this package version.", App.savedata.AppName, CustomDialog.Mode.Message);
+                    return;
+                }
                 string cacheFolder = Path.Combine(App.savedata.RepoPath, package.ID, version);
                 string zipPath = Path.Combine(cacheFolder, $"{package.ID}_{version}.zip");
                 string projectPackagePath = Path.Combine(currentproject.ProjectPath, "Packages", package.ID);
@@ -764,7 +767,7 @@ namespace BVCC
         {
             
             var targets = allPackages
-                .Where(p => p.IsInstalled && p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion))
+                .Where(p => p.IsInstalled && p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion) && p.Status != CompatibilityStatus.Incompatible)
                 .Select(p => (p, p.LatestVersion))
                 .ToList();
             await RunBulkOperation(targets, (p, v) => InstallOrUpdatePackage(p, v), "UPDATING");
@@ -773,7 +776,7 @@ namespace BVCC
         private async void ReinstallAll_Click(object sender, RoutedEventArgs e)
         {
             var targets = allPackages
-                .Where(p => p.IsInstalled && !string.IsNullOrEmpty(p.CurrentVersion))
+                .Where(p => p.IsInstalled && !string.IsNullOrEmpty(p.CurrentVersion) && p.Status != CompatibilityStatus.Incompatible)
                 .Select(p => (p, p.CurrentVersion))
                 .ToList();
             await RunBulkOperation(targets, (p, v) => InstallOrUpdatePackage(p, v, force: true), "REINSTALLING");

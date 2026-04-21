@@ -50,7 +50,7 @@ namespace BVCC
 
         private void BackBtn_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+            UIHelper.GoBack();
         }
 
         private void Template_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)

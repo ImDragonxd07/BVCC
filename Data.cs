@@ -14,6 +14,13 @@ namespace BVCC
 {
     public class Data
     {
+        public class ProjectBackup
+        {
+            public string Name { get; set; }
+            public string Path { get; set; }
+            public ProjectItem Project { get; set; }
+            public DateTime date { get; set; }
+        }
         public class SaveData
         {
             public string AppName { get; set; } = "BVCC";
@@ -22,10 +29,11 @@ namespace BVCC
             public bool CheckForUpdates { get; set; } = true;
             public bool ShowPreReleases { get; set; } = true;
             public bool OpenUnityAfterProjectCreation { get; set; } = false;
-
+            public bool SwipeOnProjectClone { get; set; }  = true;
             public List<RepoItem> Repositories { get; set; } = new List<RepoItem>();
             public List<ProjectItem> Projects { get; set; } = new List<ProjectItem>();
             public List<RepoTemplate> RepoTemplates { get; set; } = new List<RepoTemplate>();
+            public List<ProjectBackup> ProjectBackups { get; set; } = new List<ProjectBackup>();
             public string ProjectsFolder { get; set; } = "";
             public string UnityEditorPath { get; set; } = "";
             public string RepoPath { get; set; }  = "";

@@ -636,6 +636,27 @@
                                         FontSize="13"
                                         FontWeight="SemiBold"
                                         Foreground="White"
+                                        Text="Auto Swipe On Backup Clone" />
+
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Swipe back to the main menu after cloning a backup" />
+                                </StackPanel>
+                                <CheckBox
+                                    x:Name="SwipeBackupClone"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="SwipeBackupClone_Click"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
                                         Text="App Version" />
 
                                     <TextBlock
@@ -654,6 +675,7 @@
                                     SelectionChanged="AppVersionComboBox_SelectionChanged"
                                     Style="{StaticResource VersionComboBox}" />
                             </Grid>
+
                         </StackPanel>
                     </Border>
                     <TextBlock
@@ -834,6 +856,12 @@
                             Grid.Column="1"
                             HorizontalAlignment="Right"
                             Orientation="Horizontal">
+                            <StackPanel.Resources>
+                                <Style BasedOn="{StaticResource PillButton}" TargetType="Button">
+                                    <Setter Property="Margin" Value="0,0,10,0" />
+                                    <Setter Property="VerticalAlignment" Value="Center" />
+                                </Style>
+                            </StackPanel.Resources>
 
                             <Button
                                 x:Name="OpenDataButton"
@@ -844,8 +872,18 @@
                                 BorderThickness="1"
                                 Click="OpenDataButton_Click"
                                 Content="OPEN DATA"
-                                Foreground="#FF0078D4"
-                                Style="{StaticResource PillButton}" />
+                                Foreground="#FF0078D4" />
+
+                            <Button
+                                x:Name="DeleteBackupsBtn"
+                                Width="140"
+                                Height="30"
+                                Background="Transparent"
+                                BorderBrush="#FF4B4B"
+                                BorderThickness="1"
+                                Click="DeleteBackupsBtn_Click"
+                                Content="DELETE ALL BACKUPS"
+                                Foreground="#FF4B4B" />
 
                             <Button
                                 x:Name="ClearCacheBtn"
@@ -856,20 +894,19 @@
                                 BorderThickness="1"
                                 Click="ClearCacheBtn_Click"
                                 Content="CLEAR CACHE"
-                                Foreground="#FF4B4B"
-                                Style="{StaticResource PillButton}" />
+                                Foreground="#FF4B4B" />
 
                             <Button
                                 x:Name="ResetDataBtn"
                                 Width="110"
                                 Height="30"
+                                Margin="0"
                                 Background="Transparent"
                                 BorderBrush="#FF4B4B"
                                 BorderThickness="1"
                                 Click="ResetDataBtn_Click"
                                 Content="RESET DATA"
-                                Foreground="#FF4B4B"
-                                Style="{StaticResource PillButton}" />
+                                Foreground="#FF4B4B" />
                         </StackPanel>
                     </Grid>
 

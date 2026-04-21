@@ -53,7 +53,24 @@ namespace BVCC
             var clean = v.Split('-')[0];
             return Version.TryParse(clean, out var parsed) ? parsed : new Version(0, 0);
         }
+        private async Task DeleteDirectorySafe(string targetDir)
+        {
+            if (!Directory.Exists(targetDir)) return;
 
+            await Task.Run(() =>
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+
+                string[] files = Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories);
+                foreach (string file in files)
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                    File.Delete(file);
+                }
+                Directory.Delete(targetDir, true);
+            });
+        }
         public async Task DownloadFileAsync(string url, string outputPath, Action<float> onProgress = null)
         {
             using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
@@ -115,6 +132,7 @@ namespace BVCC
             if (package == null) return;
             if (string.IsNullOrEmpty(version)) return;
             currentproject.LastModified = DateTime.Now;
+            App.SaveToDisk();
             string packagesPath = Path.Combine(currentproject.ProjectPath, "Packages");
             string manifestPath = Path.Combine(packagesPath, "vpm-manifest.json");
             DriveInfo drive = new DriveInfo(Path.GetPathRoot(currentproject.ProjectPath));
@@ -196,10 +214,10 @@ namespace BVCC
 
                 package.InstallProgress = 0.7;
 
-                await Task.Run(() =>
+                await Task.Run(async () =>
                 {
                     if (Directory.Exists(projectPackagePath))
-                        Directory.Delete(projectPackagePath, true);
+                        await DeleteDirectorySafe(projectPackagePath);
 
                     ZipFile.ExtractToDirectory(zipPath, projectPackagePath);
                 });
@@ -645,7 +663,7 @@ namespace BVCC
             }
         }
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
-        private void BackBtn_Click(object sender, RoutedEventArgs e) => UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+        private void BackBtn_Click(object sender, RoutedEventArgs e) => UIHelper.GoBack();
         private void LaunchProjectBtn_Click(object sender, RoutedEventArgs e) { if (currentproject != null) App.OpenProject(currentproject); }
         private void OpenFilePath_Click(object sender, RoutedEventArgs e) => App.OpenProjectPath(currentproject.ProjectPath);
         private void InstallPackage_Click(object sender, RoutedEventArgs e) { if (((Button)sender).DataContext is ProjectPackage p) _ = InstallOrUpdatePackage(p, p.SelectedVersion); }
@@ -685,7 +703,7 @@ namespace BVCC
                     string path = Path.Combine(currentproject.ProjectPath, "Packages", p.ID);
                     p.InstallProgress = 0.4;
                     if (Directory.Exists(path))
-                        await Task.Run(() => Directory.Delete(path, true));
+                        await Task.Run(() => DeleteDirectorySafe(path));
                     p.InstallProgress = 0.7;
                     await UpdateManifest(p.ID, null, true);
                     p.InstallProgress = 1.0;
@@ -793,6 +811,7 @@ namespace BVCC
                     {
                         p.CurrentAction = PackageAction.ChangingVersion;
                         _ = InstallOrUpdatePackage(p, ver);
+
                     }
                     else
                     {
@@ -840,6 +859,80 @@ namespace BVCC
         {
             var sb = (Storyboard)Resources["ShimmerStoryboard"];
             sb.Begin();
+        }
+
+        private void BackupsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            ProjectBackupPage bakckuppdage = new ProjectBackupPage(currentproject);
+            UIHelper.SwipePage(bakckuppdage,false);
+        }
+
+        private void MoreBtn_Click(object sender, RoutedEventArgs e)
+        {
+            MorePopup.IsOpen = !MorePopup.IsOpen;
+            double offset = MoreBtn.ActualWidth - MorePopup.Child.DesiredSize.Width;
+            MorePopup.HorizontalOffset = offset;
+        }
+
+        private void CloneProjectBtn_Click(object sender, RoutedEventArgs e)
+        {
+            string newName = $"{currentproject.ProjectName} Copy";
+            string newPath = Path.Combine(Path.GetDirectoryName(currentproject.ProjectPath), newName);
+            int copyIndex = 1;
+            while (Directory.Exists(newPath) || File.Exists(newPath))
+            {
+                newName = $"{currentproject.ProjectName} Copy {copyIndex}";
+                newPath = Path.Combine(Path.GetDirectoryName(currentproject.ProjectPath), newName);
+                copyIndex++;
+            }
+            try
+            {
+                if (Directory.Exists(currentproject.ProjectPath))
+                    App.CopyDirectory(currentproject.ProjectPath, newPath);
+                else if (File.Exists(currentproject.ProjectPath))
+                    File.Copy(currentproject.ProjectPath, newPath);
+                var newProject = new ProjectItem()
+                {
+                    ProjectName = newName,
+                    ProjectPath = newPath,
+                    LastModified = DateTime.Now
+                };
+                App.savedata.Projects.Add(newProject);
+                App.SaveToDisk();
+                App.ProjectsPage.RefreshProjects();
+                UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+            }
+            catch (Exception ex)
+            {
+                CustomDialog.Show($"Failed to clone project: {ex.Message}", "Error", CustomDialog.Mode.Message);
+            }
+        }
+
+        private async void DeleteProjectBtn_Click(object sender, RoutedEventArgs e)
+        {
+            bool confirm = (bool)CustomDialog.Show(
+                $"Delete {currentproject.ProjectName}? This action cannot be undone.",
+                "Confirm",
+                CustomDialog.Mode.Question);
+
+            if (!confirm) return;
+
+            string path = currentproject.ProjectPath;
+            if(Directory.Exists(path))
+            {
+                try
+                {
+                    App.savedata.Projects.Remove(currentproject);
+                    App.SaveToDisk();
+                    App.ProjectsPage.RefreshProjects();
+                    Directory.Delete(path, true);
+                    UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+                }
+                catch (Exception ex)
+                {
+                    CustomDialog.Show($"Failed to delete project: {ex.Message}", "Error", CustomDialog.Mode.Message);
+                }
+            }
         }
     }
 }

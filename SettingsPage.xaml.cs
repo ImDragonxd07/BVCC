@@ -55,6 +55,7 @@ namespace BVCC
             OpenAfterProjectCreateCheckBox.IsChecked = App.savedata.OpenUnityAfterProjectCreation;
             ShowPreReleasesCheckBox.IsChecked = App.savedata.ShowPreReleases;
             CheckForUpdatesCheckBox.IsChecked = App.savedata.CheckForUpdates;
+            SwipeBackupClone.IsChecked = App.savedata.SwipeOnProjectClone;
         }
 
         public async Task<List<RepoItem>> FetchRepoPackagesAsync(string url)
@@ -328,7 +329,7 @@ namespace BVCC
 
         private void BackBtn_Click(object sender, RoutedEventArgs e)
         {
-            UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+            UIHelper.GoBack();
         }
 
         public void ResetDataBtn_Click(object sender, RoutedEventArgs e)
@@ -536,6 +537,37 @@ namespace BVCC
                 App.savedata.SeenReadme = false;
                 App.DownloadAndInstallVersion(selectedrelease);
             }
+        }
+
+        private void DeleteBackupsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                foreach (var file in Directory.GetFiles(App.BackupFolder))
+                {
+                    File.Delete(file);
+                }
+                foreach (var dir in Directory.GetDirectories(App.BackupFolder))
+                {
+                    Directory.Delete(dir, true);
+                }
+                App.savedata.ProjectBackups.Clear();
+                App.SaveToDisk();
+                CustomDialog.Show("Removed all backups", App.savedata.AppName, CustomDialog.Mode.Message);
+            }
+            catch (Exception ex)
+            {
+                CustomDialog.Show($"Failed to delete backups: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
+            }
+        }
+
+        private void SwipeBackupClone_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.savedata == null) return;
+            CheckBox checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+            App.savedata.SwipeOnProjectClone = checkBox.IsChecked == true;
+            App.SaveToDisk();
         }
     }
 }

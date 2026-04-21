@@ -185,7 +185,7 @@ namespace BVCC
         }
         private void BackBtn_Click(object sender, RoutedEventArgs e)
         {
-            UIHelper.SwipePage(App.ProjectsPage.ProjectListUI, true);
+            UIHelper.GoBack();
         }
 
         private void BrowseProjectPath_Click(object sender, RoutedEventArgs e)
@@ -286,22 +286,7 @@ namespace BVCC
             App.SaveToDisk();
         }
 
-        private static void CopyDirectory(string sourceDir, string destinationDir)
-            {
-                Directory.CreateDirectory(destinationDir);
 
-                foreach (var file in Directory.GetFiles(sourceDir))
-                {
-                    var destFile = Path.Combine(destinationDir, Path.GetFileName(file));
-                    File.Copy(file, destFile, true);
-                }
-
-                foreach (var dir in Directory.GetDirectories(sourceDir))
-                {
-                    var destSubDir = Path.Combine(destinationDir, Path.GetFileName(dir));
-                    CopyDirectory(dir, destSubDir);
-                }
-        }
         private async Task SetProgress(double value)
         {
             CreateProgress = value;
@@ -378,7 +363,7 @@ namespace BVCC
 
                 await Task.Run(() =>
                 {
-                    CopyDirectory(source, destination);
+                    App.CopyDirectory(source, destination);
                 });
 
                 Log("File copy complete");

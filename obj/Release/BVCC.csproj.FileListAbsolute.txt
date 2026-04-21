@@ -38,3 +38,5 @@ C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\BVCC.exe
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\CustomDialog.baml
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\CustomDialog.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\App.baml
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\ProjectBackupPage.g.cs
+C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\ProjectBackupPage.baml

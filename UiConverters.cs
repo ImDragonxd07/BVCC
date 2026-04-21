@@ -75,6 +75,28 @@ namespace BVCC
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotImplementedException();
+
+    }
+    public class ProgressWidthConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values.Length < 4) return 0.0;
+
+            if (!double.TryParse(values[0]?.ToString(), out double value) ||
+                !double.TryParse(values[1]?.ToString(), out double minimum) ||
+                !double.TryParse(values[2]?.ToString(), out double maximum) ||
+                !double.TryParse(values[3]?.ToString(), out double width))
+                return 0.0;
+
+            if (maximum <= minimum || width <= 0) return 0.0;
+
+            double ratio = (value - minimum) / (maximum - minimum);
+            return Math.Max(0.0, Math.Min(width * ratio, width));
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
     public class GreaterThanZeroToVisibilityConverter : IValueConverter
     {

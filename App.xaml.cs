@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.IO.Pipes;
 using System.Linq;
 using System.Management.Instrumentation;
@@ -27,6 +28,14 @@ namespace BVCC
     public partial class App : Application
     {
         // Logo from https://www.flaticon.com/free-icon/3d_11437059?term=cubes&related_id=11437059
+
+        private string[] structure = new[]
+            {
+                "Settings.json",
+                "Repos",
+                "Templates",
+                "Backups"
+            };
         public static ProjectsPage ProjectsPage { get; private set; }
         public static SettingsPage SettingsPage { get; private set; }
         public static NewFromTemplate NewFromTemplatePage { get; private set; }
@@ -35,29 +44,26 @@ namespace BVCC
         public static SaveData savedata = new SaveData();
         public static bool TemplatesInsalled = false;
         public static List<GitHubRelease> GitHubReleases { get; set; } = new List<GitHubRelease>();
-        private async Task<XmlDocument> GetDocFromWeb(string url)
-        {
-            using (HttpClient client = new HttpClient())
-            {
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-                string xmlContent = await client.GetStringAsync(url).ConfigureAwait(false);
-                XmlReaderSettings settings = new XmlReaderSettings();
-                settings.DtdProcessing = DtdProcessing.Parse;
-                settings.XmlResolver = new XmlUrlResolver();
-
-                XmlDocument doc = new XmlDocument();
-                using (StringReader stringReader = new StringReader(xmlContent))
-                using (XmlReader reader = XmlReader.Create(stringReader, settings))
-                {
-                    doc.Load(reader);
-                }
-                return doc;
-            }
-        }
-
+        public static string BackupFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
         protected override void OnStartup(StartupEventArgs e)
         {
             OnStartupAsync(e);
+        }
+        public static void CopyDirectory(string sourceDir, string destinationDir)
+        {
+            Directory.CreateDirectory(destinationDir);
+
+            foreach (var file in Directory.GetFiles(sourceDir))
+            {
+                var destFile = Path.Combine(destinationDir, Path.GetFileName(file));
+                File.Copy(file, destFile, true);
+            }
+
+            foreach (var dir in Directory.GetDirectories(sourceDir))
+            {
+                var destSubDir = Path.Combine(destinationDir, Path.GetFileName(dir));
+                CopyDirectory(dir, destSubDir);
+            }
         }
         public static async Task<List<GitHubRelease>> GetAllReleases()
         {
@@ -336,7 +342,72 @@ namespace BVCC
                 });
             }
         }
+        private async Task<bool> DownloadAndInstallTemplates(
+    string url,
+    string extractPath,
+    Action<string> updateStatus,
+    Action<double> updateProgress)
+        {
+            try
+            {
+                string zipPath = Path.Combine(Path.GetTempPath(), "templates.zip");
 
+                updateStatus?.Invoke("Downloading Templates");
+                updateProgress?.Invoke(0);
+
+                using (HttpClient client = new HttpClient())
+                using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+                {
+                    response.EnsureSuccessStatusCode();
+
+                    var totalBytes = response.Content.Headers.ContentLength ?? -1L;
+                    var canReportProgress = totalBytes != -1;
+
+                    using (var stream = await response.Content.ReadAsStreamAsync())
+                    using (var fileStream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        byte[] buffer = new byte[8192];
+                        long totalRead = 0;
+                        int bytesRead;
+
+                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        {
+                            await fileStream.WriteAsync(buffer, 0, bytesRead);
+                            totalRead += bytesRead;
+
+                            if (canReportProgress)
+                            {
+                                double progress = ((double)totalRead / totalBytes) * 100;
+                                updateProgress?.Invoke(progress);
+                            }
+                        }
+                    }
+                }
+
+                updateStatus?.Invoke("Extracting Templates");
+                updateProgress?.Invoke(0);
+
+                await Task.Run(() =>
+                {
+                    if (Directory.Exists(extractPath))
+                        Directory.Delete(extractPath, true);
+
+                    ZipFile.ExtractToDirectory(zipPath, extractPath);
+                });
+
+                updateProgress?.Invoke(100);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    CustomDialog.Show($"Failed to install templates: {ex.Message}", "Error", CustomDialog.Mode.Message);
+                });
+
+                return false;
+            }
+        }
         private async Task<GitHubRelease> GetLatestGithubRelease()
         {
             GitHubReleases = await GetAllReleases();
@@ -363,14 +434,10 @@ namespace BVCC
             }
             _ = Task.Run(() => StartPipeServer(_pipeCts.Token));
             base.OnStartup(e);
+            splash = new SplashScreen();
+            splash.Show();
+            splash.LoadingStatus.Text = "INIT";
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-
-            var structure = new[]
-            {
-                "Settings.json",
-                "Repos",
-                "Templates"
-            };
 
             foreach (var entry in structure)
             {
@@ -417,7 +484,25 @@ namespace BVCC
                 !Directory.EnumerateFiles(templatesDir, "*", SearchOption.AllDirectories).Any())
             {
 
-                CustomDialog.Show("No templates found! Please add some to the Templates folder and restart the app if you want to use them.", "No Templates Detected", CustomDialog.Mode.Message);
+                bool downloadtemplatesquestion = (bool)CustomDialog.Show("No templates found! Do you want to download them?", "No Templates Detected", CustomDialog.Mode.Question);
+                if (!downloadtemplatesquestion)
+                    return;
+                splash.LoadingBar.IsIndeterminate = false;
+
+                string url = "https://raw.githubusercontent.com/ImDragonxd07/BVCC/main/Templates.zip";
+                string extractPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates");
+
+                bool success = await DownloadAndInstallTemplates(
+                    url,
+                    extractPath,
+                    status => splash.LoadingStatus.Text = status,
+                    progress => splash.LoadingBar.Value = progress
+                );
+
+                if (success)
+                {
+                    TemplatesInsalled = true;
+                }
             }
             else
             {
@@ -436,9 +521,6 @@ namespace BVCC
                     PackageIDs = new System.Collections.Generic.List<string>() { "com.vrchat.core.vpm-resolver", "com.vrchat.base", "com.vrchat.worlds" }
                 });
             }
-            splash = new SplashScreen();
-            splash.Show();
-            splash.LoadingStatus.Text = "INIT";
             bool skipupdate = argsList.Contains("--noupdate");
             if (savedata.CheckForUpdates && !skipupdate)
             {

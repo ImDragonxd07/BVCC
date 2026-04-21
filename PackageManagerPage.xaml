@@ -457,30 +457,29 @@
                             Foreground="White"
                             Text="Project Title" />
                     </StackPanel>
-                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <StackPanel
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+
                         <Button
                             x:Name="UnityVersionText"
                             Width="90"
                             Margin="0,0,8,0"
                             Background="#FF333333"
                             Content="Version"
+                            IsHitTestVisible="False"
                             Style="{StaticResource HeroPillButton}" />
+
                         <Button
-                            x:Name="OpenFilePath"
-                            Width="90"
+                            x:Name="BackupsBtn"
+                            Width="85"
                             Margin="0,0,8,0"
                             Background="#FF333333"
-                            Click="OpenFilePath_Click"
-                            Content="Open Path"
+                            Click="BackupsBtn_Click"
+                            Content="Backups"
                             Style="{StaticResource HeroPillButton}" />
-                        <Button
-                            x:Name="RemoveProjectBtn"
-                            Width="130"
-                            Margin="0,0,8,0"
-                            Background="#FF882222"
-                            Click="RemoveProjectBtn_Click"
-                            Content="REMOVE PROJECT"
-                            Style="{StaticResource HeroPillButton}" />
+
                         <Button
                             x:Name="LaunchProjectBtn"
                             Width="85"
@@ -488,6 +487,79 @@
                             Click="LaunchProjectBtn_Click"
                             Content="LAUNCH"
                             Style="{StaticResource HeroPillButton}" />
+
+                        <Button
+                            x:Name="MoreBtn"
+                            Width="36"
+                            Height="32"
+                            Margin="8,0,0,0"
+                            Background="#FF333333"
+                            Click="MoreBtn_Click"
+                            Style="{StaticResource HeroPillButton}">
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe MDL2 Assets"
+                                FontSize="10"
+                                Text="&#xE70D;" />
+                        </Button>
+
+                        <Popup
+                            x:Name="MorePopup"
+                            AllowsTransparency="True"
+                            HorizontalOffset="-114"
+                            Placement="Bottom"
+                            PlacementTarget="{Binding ElementName=MoreBtn}"
+                            StaysOpen="False">
+                            <Border
+                                Width="150"
+                                Margin="0,4,0,0"
+                                Background="#FF1E1E1E"
+                                BorderBrush="#FF333333"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                                <StackPanel Margin="6">
+                                    <StackPanel.Resources>
+                                        <Style BasedOn="{StaticResource TitleBarButton}" TargetType="Button">
+                                            <Setter Property="Height" Value="32" />
+                                            <Setter Property="Padding" Value="12,0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Left" />
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderThickness" Value="0" />
+                                            <Setter Property="FontSize" Value="11" />
+                                            <Setter Property="Foreground" Value="White" />
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#FF333333" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Resources>
+
+                                    <Button
+                                        x:Name="OpenFilePathBtn"
+                                        Click="OpenFilePath_Click"
+                                        Content="Open Path" />
+
+                                    <Button
+                                        x:Name="CloneProjectBtn"
+                                        Click="CloneProjectBtn_Click"
+                                        Content="Clone Project" />
+
+                                    <Button
+                                        x:Name="RemoveProjectBtnMenu"
+                                        Click="RemoveProjectBtn_Click"
+                                        Content="Remove Project"
+                                        Foreground="#FFFF6666" />
+
+                                    <Button
+                                        x:Name="DeleteProjectBtn"
+                                        Click="DeleteProjectBtn_Click"
+                                        Content="Delete Project"
+                                        Foreground="#FFFF6666" />
+                                </StackPanel>
+                            </Border>
+                        </Popup>
                     </StackPanel>
                 </Grid>
                 <Grid Margin="0,0,0,10">

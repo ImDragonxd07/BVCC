@@ -344,7 +344,6 @@
 
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="0,0,10,0">
-
                     <TextBlock
                         Margin="0,0,0,10"
                         FontSize="12"
@@ -517,6 +516,213 @@
 
                         </StackPanel>
                     </Border>
+                    <TextBlock
+                        Margin="0,0,0,10"
+                        FontSize="12"
+                        FontWeight="Bold"
+                        Foreground="#FF0078D4"
+                        Text="VRCHAT ACCOUNT" />
+                    <Border
+                        Margin="0,0,0,20"
+                        Padding="15"
+                        Background="#FF222222"
+                        CornerRadius="10">
+                        <StackPanel>
+                            <Grid
+                                x:Name="VrcLoggedInPanel"
+                                Margin="0,0,0,12"
+                                Visibility="Collapsed">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Logged In" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock
+                                            FontSize="10"
+                                            Foreground="#88FFFFFF"
+                                            Text="Signed in as " />
+                                        <TextBlock
+                                            x:Name="VrcUsernameText"
+                                            FontSize="10"
+                                            FontWeight="SemiBold"
+                                            Foreground="#FF0078D4" />
+                                    </StackPanel>
+                                </StackPanel>
+                                <Button
+                                    Width="80"
+                                    Height="28"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Background="#FF4B4B"
+                                    BorderThickness="1"
+                                    Click="VrcLogoutBtn_Click"
+                                    Content="LOG OUT"
+                                    FontSize="9"
+                                    Style="{StaticResource PillButton}" />
+                            </Grid>
+                            <StackPanel x:Name="VrcLoginPanel">
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Width="80"
+                                        VerticalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="#88FFFFFF"
+                                        Text="Email" />
+                                    <Border
+                                        Grid.Column="1"
+                                        Padding="10,0"
+                                        Background="#1AFFFFFF"
+                                        CornerRadius="8">
+                                        <TextBox
+                                            x:Name="VrcEmailBox"
+                                            Height="30"
+                                            VerticalContentAlignment="Center"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            CaretBrush="White"
+                                            FontSize="11"
+                                            Foreground="White" />
+                                    </Border>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Width="80"
+                                        VerticalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="#88FFFFFF"
+                                        Text="Password" />
+                                    <Border
+                                        Grid.Column="1"
+                                        Padding="10,0"
+                                        Background="#1AFFFFFF"
+                                        CornerRadius="8">
+                                        <PasswordBox
+                                            x:Name="VrcPasswordBox"
+                                            Height="30"
+                                            VerticalContentAlignment="Center"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            CaretBrush="White"
+                                            FontSize="11"
+                                            Foreground="White" />
+                                    </Border>
+                                </Grid>
+
+
+                                <TextBlock
+                                    x:Name="VrcLoginStatusText"
+                                    Margin="0,0,0,8"
+                                    FontSize="10"
+                                    Foreground="#FFFF4B4B"
+                                    Text=""
+                                    Visibility="Collapsed" />
+
+                                <Button
+                                    x:Name="VrcLoginBtn"
+                                    Height="32"
+                                    Background="#FF0078D4"
+                                    Click="VrcLoginBtn_Click"
+                                    Content="LOG IN TO VRCHAT"
+                                    Style="{StaticResource PillButton}" />
+
+                            </StackPanel>
+                            <Grid
+                                x:Name="VrcTwoFactorPanel"
+                                Margin="0,10,0,0"
+                                Visibility="Collapsed">
+
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="12"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Two-Factor Authentication" />
+
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Enter your 2FA code to continue login." />
+
+                                    <Border
+                                        Margin="0,8,0,0"
+                                        Padding="10,0"
+                                        Background="#1AFFFFFF"
+                                        CornerRadius="8">
+
+                                        <TextBox
+                                            x:Name="VrcTwoFactorBox"
+                                            Height="30"
+                                            VerticalContentAlignment="Center"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            CaretBrush="White"
+                                            FontSize="11"
+                                            Foreground="White"
+                                            MaxLength="10" />
+                                    </Border>
+
+                                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                        <Button
+                                            x:Name="VrcTwoFactorSubmitBtn"
+                                            Width="100"
+                                            Height="30"
+                                            Background="#FF0078D4"
+                                            Click="VrcTwoFactorSubmit_Click"
+                                            Content="VERIFY"
+                                            Style="{StaticResource PillButton}" />
+
+                                        <Button
+                                            Width="80"
+                                            Height="30"
+                                            Margin="10,0,0,0"
+                                            Background="#FFFF4B4B"
+                                            Click="VrcTwoFactorCancel_Click"
+                                            Content="CANCEL"
+                                            Style="{StaticResource PillButton}" />
+                                    </StackPanel>
+
+                                    <TextBlock
+                                        x:Name="VrcTwoFactorStatus"
+                                        Margin="0,5,0,0"
+                                        FontSize="10"
+                                        Foreground="#FFFF4B4B"
+                                        Visibility="Collapsed" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,15,0,0">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
+                                        Text="Auto Login on Launch" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Automatically restore your VRChat session when BVCC starts." />
+                                </StackPanel>
+                                <CheckBox
+                                    x:Name="VrcAutoLoginCheckBox"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="VrcAutoLoginCheckBox_Click"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>
+
+                        </StackPanel>
+                    </Border>
 
                     <TextBlock
                         Margin="0,0,0,10"
@@ -556,6 +762,7 @@
                                 Style="{StaticResource PillButton}" />
                         </Grid>
                     </Border>
+
                     <TextBlock
                         Margin="0,0,0,10"
                         FontSize="12"
@@ -637,7 +844,6 @@
                                         FontWeight="SemiBold"
                                         Foreground="White"
                                         Text="Auto Swipe On Backup Clone" />
-
                                     <TextBlock
                                         FontSize="10"
                                         Foreground="#88FFFFFF"
@@ -658,7 +864,6 @@
                                         FontWeight="SemiBold"
                                         Foreground="White"
                                         Text="App Version" />
-
                                     <TextBlock
                                         FontSize="10"
                                         Foreground="#88FFFFFF"
@@ -678,6 +883,7 @@
 
                         </StackPanel>
                     </Border>
+
                     <TextBlock
                         Margin="0,0,0,10"
                         FontSize="12"
@@ -746,7 +952,6 @@
                                     Click="UnityEditorPathButton_Click"
                                     Content="BROWSE"
                                     Style="{StaticResource PillButton}" />
-
                             </Grid>
 
                             <TextBlock
@@ -777,10 +982,10 @@
                                     Click="LocalRepoPathButton_Click"
                                     Content="BROWSE"
                                     Style="{StaticResource PillButton}" />
-
                             </Grid>
                         </StackPanel>
                     </Border>
+
                     <TextBlock
                         Margin="0,0,0,10"
                         FontSize="12"
@@ -821,7 +1026,6 @@
                                     MD Badsha Meah - freeicons</TextBlock>
                             </Grid>
                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image
                                         Width="64"
@@ -846,6 +1050,7 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -911,7 +1116,6 @@
                     </Grid>
 
                 </StackPanel>
-
             </ScrollViewer>
 
             <StackPanel

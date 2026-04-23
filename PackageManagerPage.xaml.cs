@@ -15,8 +15,10 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
+using VRChat.API.Model;
 using static BVCC.Data;
 using static BVCC.Data.ProjectPackage;
+using File = System.IO.File;
 
 namespace BVCC
 {
@@ -47,11 +49,6 @@ namespace BVCC
         {
             App.RepoCache.Clear();
             App.CachedPackages.Clear();
-        }
-        private static Version ParseVersion(string v)
-        {
-            var clean = v.Split('-')[0];
-            return Version.TryParse(clean, out var parsed) ? parsed : new Version(0, 0);
         }
         private async Task DeleteDirectorySafe(string targetDir)
         {
@@ -372,7 +369,7 @@ namespace BVCC
 
                 latest = versions.Properties()
                     .Select(p => p.Name)
-                    .OrderByDescending(ParseVersion)
+                    .OrderByDescending(UnityHelper.ParseVersion)
                     .FirstOrDefault();
 
                 break;
@@ -553,6 +550,7 @@ namespace BVCC
 
                 allPackages = finalList;
                 UnityVersionText.Content = unityVersion;
+                DetailsStrip.Visibility = App.api.IsLoggedIn ? Visibility.Visible : Visibility.Collapsed;
                 ApplyFilter();
             }
             catch (Exception ex)
@@ -563,8 +561,63 @@ namespace BVCC
             {
                 SetLoadingState(false);
             }
+            RefreshDetailStrip();
+            //UnityHelper.ExtractVRCInfo(currentproject.ProjectPath);
+
+        }
+        private async void RefreshDetailStrip()
+        {
+            if (App.api == null || !App.api.IsLoggedIn || currentproject == null) return;
+
+            try
+            {
+                var vrcInfo = await UnityHelper.ExtractVRCInfo(currentproject.ProjectPath);
+                WinIcon.Visibility = Visibility.Collapsed;
+                IOSIcon.Visibility = Visibility.Collapsed;
+                AndroidIcon.Visibility = Visibility.Collapsed;
+
+                if (vrcInfo.VrcId.StartsWith("wrld_"))
+                {
+                    var world = await App.api.GetWorldAsync(vrcInfo.VrcId);
+                    VrcContentNameText.Text = world.Name;
+                    UploadStatusText.Text = world.ReleaseStatus.ToString();
+
+                    UpdatePlatformIcons(world.UnityPackages);
+                }
+                else if (vrcInfo.VrcId.StartsWith("avtr_"))
+                {
+                    var avatar = await App.api.GetAvatarAsync(vrcInfo.VrcId);
+                    VrcContentNameText.Text = avatar.Name;
+                    UploadStatusText.Text = avatar.ReleaseStatus.ToString();
+
+                    UpdatePlatformIcons(avatar.UnityPackages);
+                }
+            }
+            catch { VrcContentNameText.Text = "Offline / Not Owner"; }
         }
 
+        private void UpdatePlatformIcons(List<UnityPackage> packages)
+        {
+            if (packages == null) return;
+
+            foreach (var pkg in packages)
+            {
+                string platform = pkg.Platform.ToLower();
+
+                if (platform.Contains("windows"))
+                {
+                    WinIcon.Visibility = Visibility.Visible;
+                }
+                else if (platform.Contains("android"))
+                {
+                    AndroidIcon.Visibility = Visibility.Visible;
+                }
+                else if (platform.Contains("ios"))
+                {
+                    IOSIcon.Visibility = Visibility.Visible;
+                }
+            }
+        }
         private void ApplyFilter()
         {
 
@@ -589,8 +642,8 @@ namespace BVCC
             else if (_activeSortField == "Version")
             {
                 filtered = _sortAscending
-                    ? filtered.OrderBy(p => ParseVersion(p.CurrentVersion ?? "0.0"))
-                    : filtered.OrderByDescending(p => ParseVersion(p.CurrentVersion ?? "0.0"));
+                    ? filtered.OrderBy(p => UnityHelper.ParseVersion(p.CurrentVersion ?? "0.0"))
+                    : filtered.OrderByDescending(p => UnityHelper.ParseVersion(p.CurrentVersion ?? "0.0"));
             }
             else
             {
@@ -840,8 +893,8 @@ namespace BVCC
                 filtered = filtered.Where(v => !IsPreRelease(v));
 
             return filtered
-                .OrderBy(v => ascending ? ParseVersion(v) : new Version(0, 0))
-                .ThenByDescending(v => ascending ? new Version(0, 0) : ParseVersion(v))
+                .OrderBy(v => ascending ? UnityHelper.ParseVersion(v) : new Version(0, 0))
+                .ThenByDescending(v => ascending ? new Version(0, 0) : UnityHelper.ParseVersion(v))
                 .ToList();
         }
         private void RemoveProjectBtn_Click(object sender, RoutedEventArgs e)
@@ -933,6 +986,12 @@ namespace BVCC
                     CustomDialog.Show($"Failed to delete project: {ex.Message}", "Error", CustomDialog.Mode.Message);
                 }
             }
+        }
+
+        private void ToggleDetailsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            CheckBox checkBox = sender as CheckBox;
+            DetailsStrip.Visibility = checkBox.IsChecked == true && App.api.IsLoggedIn ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 }

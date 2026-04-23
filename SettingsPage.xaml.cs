@@ -18,6 +18,7 @@ namespace BVCC
 {
     public partial class SettingsPage : UserControl
     {
+        private VRCApi _pendingApi;
         public SettingsPage()
         {
             InitializeComponent();
@@ -56,6 +57,8 @@ namespace BVCC
             ShowPreReleasesCheckBox.IsChecked = App.savedata.ShowPreReleases;
             CheckForUpdatesCheckBox.IsChecked = App.savedata.CheckForUpdates;
             SwipeBackupClone.IsChecked = App.savedata.SwipeOnProjectClone;
+            VrcAutoLoginCheckBox.IsChecked = App.savedata.VrcAutoLogin;
+            UpdateVrcLoginState();
         }
 
         public async Task<List<RepoItem>> FetchRepoPackagesAsync(string url)
@@ -197,7 +200,7 @@ namespace BVCC
 
         private void ImportVCC_Click(object sender, RoutedEventArgs e)
         {
-            string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VRChatCreatorCompanion", "Settings.json");    
+            string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VRChatCreatorCompanion", "Settings.json");
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Filter = "Json files (*.json)|*.json|All files (*.*)|*.*",
@@ -244,7 +247,6 @@ namespace BVCC
                 {
                     string rUrl = repo["url"]?.ToString();
                     if (string.IsNullOrEmpty(rUrl)) continue;
-
 
                     string repoName = repo["name"]?.ToString()
                        ?? repo["displayName"]?.ToString()
@@ -296,34 +298,28 @@ namespace BVCC
 
         private void ProjectPathBoxButton_Click(object sender, RoutedEventArgs e)
         {
-            using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
+            OpenFolderDialog dialog = new OpenFolderDialog();
+            dialog.Title = "Select the default folder for your Unity Projects";
+            dialog.DefaultDirectory = App.savedata.ProjectsFolder;
+            dialog.ShowDialog();
+            if (Directory.Exists(dialog.FolderName))
             {
-                dialog.Description = "Select the default folder for your Unity Projects";
-                dialog.SelectedPath = App.savedata.ProjectsFolder;
-                if (Directory.Exists(ProjectPathBox.Text)) dialog.SelectedPath = ProjectPathBox.Text;
-
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    App.savedata.ProjectsFolder = dialog.SelectedPath;
-                    RefreshPage();
-                    App.SaveToDisk();
-                }
+                App.savedata.ProjectsFolder = dialog.FolderName;
+                RefreshPage();
+                App.SaveToDisk();
             }
         }
         private void LocalRepoPathButton_Click(object sender, RoutedEventArgs e)
         {
-            using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
+            OpenFolderDialog dialog = new OpenFolderDialog();
+            dialog.Title = "Select the default folder for your Local Repos";
+            dialog.DefaultDirectory = App.savedata.RepoPath;
+            dialog.ShowDialog();
+            if (Directory.Exists(dialog.FolderName))
             {
-                dialog.Description = "Select the default folder for your Local Repos";
-                dialog.SelectedPath = App.savedata.RepoPath;
-                if (Directory.Exists(ProjectPathBox.Text)) dialog.SelectedPath = ProjectPathBox.Text;
-
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    App.savedata.RepoPath = dialog.SelectedPath;
-                    RefreshPage();
-                    App.SaveToDisk();
-                }
+                App.savedata.RepoPath = dialog.FolderName;
+                RefreshPage();
+                App.SaveToDisk();
             }
         }
 
@@ -442,7 +438,7 @@ namespace BVCC
                 }
 
                 App.SaveToDisk();
-                //App.PackageManagerPage?.ClearRepoCache();
+
                 RefreshPage();
 
                 CustomDialog.Show($"Imported {added} repositories.", App.savedata.AppName, CustomDialog.Mode.Message);
@@ -483,7 +479,7 @@ namespace BVCC
                 CustomDialog.Show("Cache cleared.", App.savedata.AppName, CustomDialog.Mode.Message);
             }
             catch (Exception ex)
-            {   
+            {
                 CustomDialog.Show($"Failed to clear cache: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
             }
         }
@@ -514,7 +510,6 @@ namespace BVCC
             App.savedata.CheckForUpdates = checkBox.IsChecked == true;
             App.SaveToDisk();
         }
-
 
         private void AppVersionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -568,6 +563,92 @@ namespace BVCC
             if (checkBox == null) return;
             App.savedata.SwipeOnProjectClone = checkBox.IsChecked == true;
             App.SaveToDisk();
+        }
+
+        private void VrcAutoLoginCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.savedata == null) return;
+            CheckBox checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+            App.savedata.VrcAutoLogin = checkBox.IsChecked == true;
+            App.SaveToDisk();
+        }
+
+        private void UpdateVrcLoginState()
+        {
+            bool loggedIn = App.api?.IsLoggedIn == true;
+            VrcLoggedInPanel.Visibility = loggedIn ? Visibility.Visible : Visibility.Collapsed;
+            VrcLoginPanel.Visibility = loggedIn ? Visibility.Collapsed : Visibility.Visible;
+
+            VrcUsernameText.Text = loggedIn
+                ? App.api?.CurrentUserName ?? ""
+                : "";
+        }
+
+        private void VrcLogoutBtn_Click(object sender, RoutedEventArgs e)
+        {
+            App.api?.Logout();
+
+            App.api = null;
+
+            if (File.Exists("session.dat"))
+                File.Delete("session.dat");
+
+            App.savedata.VrcEmail = "";
+            App.SaveToDisk();
+
+            UpdateVrcLoginState();
+        }
+
+        private async void VrcLoginBtn_Click(object sender, RoutedEventArgs e)
+        {
+            VrcLoginBtn.IsEnabled = false;
+            VrcLoginBtn.Content = "LOGGING IN...";
+
+            _pendingApi = new VRCApi(VrcEmailBox.Text, VrcPasswordBox.Password);
+
+            var loginTask = _pendingApi.LoginAsync();
+
+            VrcLoginPanel.Visibility = Visibility.Collapsed;
+            VrcTwoFactorPanel.Visibility = Visibility.Visible;
+
+            (bool success, string message) = await loginTask;
+
+            if (success)
+            {
+                App.api = _pendingApi;
+                App.savedata.VrcEmail = VrcEmailBox.Text;
+                App.SaveToDisk();
+                UpdateVrcLoginState();
+                VrcTwoFactorPanel.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                VrcLoginStatusText.Text = message;
+                VrcLoginStatusText.Visibility = Visibility.Visible;
+                VrcTwoFactorPanel.Visibility = Visibility.Collapsed;
+                VrcLoginPanel.Visibility = Visibility.Visible;
+            }
+
+            VrcLoginBtn.IsEnabled = true;
+            VrcLoginBtn.Content = "LOG IN TO VRCHAT";
+        }
+
+        private void VrcTwoFactorSubmit_Click(object sender, RoutedEventArgs e)
+        {
+            string code = VrcTwoFactorBox.Text.Trim();
+
+            if (!string.IsNullOrEmpty(code))
+            {
+                _pendingApi?.Provide2FACode(code);
+            }
+        }
+
+        private void VrcTwoFactorCancel_Click(object sender, RoutedEventArgs e)
+        {
+            _pendingApi?.Cancel2FA();
+            VrcTwoFactorPanel.Visibility = Visibility.Collapsed;
+            VrcLoginPanel.Visibility = Visibility.Visible;
         }
     }
 }

@@ -26,6 +26,8 @@ namespace BVCC
             public string AppName { get; set; } = "BVCC";
             public string AppVersion { get; set; } = "???";
             public bool SeenReadme { get; set; } = false;
+            public string VrcEmail { get; set; } = "";
+            public bool VrcAutoLogin { get; set; } = true;
             public bool CheckForUpdates { get; set; } = true;
             public bool ShowPreReleases { get; set; } = true;
             public bool OpenUnityAfterProjectCreation { get; set; } = false;

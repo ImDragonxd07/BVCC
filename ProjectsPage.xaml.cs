@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Win32;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -8,13 +9,11 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using static BVCC.Data;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 using Application = System.Windows.Application;
 using Button = System.Windows.Controls.Button;
 
@@ -126,11 +125,11 @@ namespace BVCC
         }
         private void ImportProject_Click(object sender, RoutedEventArgs e)
         {
-            FolderBrowserDialog dialog = new FolderBrowserDialog();
+            OpenFolderDialog dialog = new OpenFolderDialog();
             dialog.ShowDialog();
-            if(Directory.Exists(dialog.SelectedPath))
+            if(Directory.Exists(dialog.FolderName))
             {
-                ImportProjectFromFile(dialog.SelectedPath);
+                ImportProjectFromFile(dialog.FolderName);
             }
         }
 

@@ -5,6 +5,8 @@
     Title="BVCC"
     Width="900"
     Height="550"
+    MinWidth="900"
+    MinHeight="550"
     AllowsTransparency="True"
     Background="Transparent"
     ResizeMode="CanResizeWithGrip"
@@ -233,7 +235,7 @@
                                             Width="80"
                                             Height="28"
                                             Margin="0,0,8,0"
-                                            Background="#FF333333"
+                                            Background="#FF0078D4"
                                             Click="LaunchBtn_Click"
                                             Content="LAUNCH"
                                             Style="{StaticResource PillButton}" />

@@ -7,11 +7,9 @@ using System.IO;
 using System.IO.Compression;
 using System.IO.Pipes;
 using System.Linq;
-using System.Management.Instrumentation;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
@@ -25,7 +23,7 @@ using Path = System.IO.Path;
 
 namespace BVCC
 {
-    public partial class App : Application
+    public partial class App : System.Windows.Application
     {
         // Logo from https://www.flaticon.com/free-icon/3d_11437059?term=cubes&related_id=11437059
 
@@ -36,6 +34,7 @@ namespace BVCC
                 "Templates",
                 "Backups"
             };
+        public static VRCApi? api { get; set; }
         public static ProjectsPage ProjectsPage { get; private set; }
         public static SettingsPage SettingsPage { get; private set; }
         public static NewFromTemplate NewFromTemplatePage { get; private set; }
@@ -161,7 +160,7 @@ namespace BVCC
                             string message = await reader.ReadLineAsync();
                             if (!string.IsNullOrWhiteSpace(message))
                             {
-                                Application.Current.Dispatcher.Invoke(() =>
+                                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                                 {
                                     _ = ProtocolRouter.HandleAsync(message);
                                 });
@@ -202,6 +201,9 @@ namespace BVCC
 
         public static async Task DownloadAndInstallVersion(GitHubRelease version)
         {
+            savedata.AppVersion = version.Version;
+            savedata.SeenReadme = false;
+            SaveToDisk();
             splash.LoadingBar.IsIndeterminate = true;
             splash.LoadingStatus.Text = $"Downloading update {version.Version}...";
             string tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BVCCSetup.exe");
@@ -223,8 +225,6 @@ namespace BVCC
                     {
                         splash.LoadingStatus.Text = "Installing";
                         await Task.Delay(800);
-                        savedata.AppVersion = version.Version;
-                        SaveToDisk();
                         var startInfo = new System.Diagnostics.ProcessStartInfo
                         {
                             FileName = tempPath,
@@ -238,6 +238,7 @@ namespace BVCC
                     else
                     {
                         tcs.SetResult(false);
+
                     }
                 };
 
@@ -262,7 +263,7 @@ namespace BVCC
 
             if (hasSplash)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     splash.LoadingBar.IsIndeterminate = false;
                     splash.LoadingBar.Value = 0;
@@ -288,7 +289,7 @@ namespace BVCC
 
                 if (hasSplash)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
                     {
                         splash.LoadingStatus.Text = $"Loading Repositories... ({loaded}/{total})";
                         splash.LoadingBar.Value = ((double)loaded / total) * 100;
@@ -336,7 +337,7 @@ namespace BVCC
 
             if (hasSplash)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     splash.LoadingBar.IsIndeterminate = true;
                 });
@@ -400,7 +401,7 @@ namespace BVCC
             }
             catch (Exception ex)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     CustomDialog.Show($"Failed to install templates: {ex.Message}", "Error", CustomDialog.Mode.Message);
                 });
@@ -536,6 +537,18 @@ namespace BVCC
                     }
                 }
             }
+            api = new VRCApi(savedata.VrcEmail, "");
+            if (savedata.VrcAutoLogin == true && savedata.VrcEmail.Length > 0)
+            {
+                splash.LoadingStatus.Text = "Log In";
+                (bool restored, string message) = await api.TryRestoreSessionAsync();
+                if (!restored)
+                {
+                    api = null;
+                    CustomDialog.Show($"Failed to restore VRChat session: {message}", "VRChat Login Failed", CustomDialog.Mode.Message);
+                }
+ 
+            }
             splash.LoadingStatus.Text = "Initializing";
             ProjectsPage = new ProjectsPage();
             SettingsPage = new SettingsPage();
@@ -550,9 +563,11 @@ namespace BVCC
             {
                 await ProtocolRouter.HandleAsync(pendingProtocol);
             }
-            await Task.Delay(500); 
+
+            await Task.Delay(500);
+
             splash.Hide();
-            Application.Current.MainWindow = ProjectsPage;
+            System.Windows.Application.Current.MainWindow = ProjectsPage;
             ProjectsPage.Show();
             if (!savedata.SeenReadme && !skipupdate)
             {
@@ -561,6 +576,8 @@ namespace BVCC
                 App.savedata.SeenReadme = true;
             }
             SaveToDisk();
+
+
         }
         private static readonly string settingsPath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.json");

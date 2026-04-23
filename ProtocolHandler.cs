@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Security.Policy;
 using System.Threading.Tasks;
 using System.Web;
-using System.Web.Profile;
 using System.Windows;
 using static BVCC.Data;
 

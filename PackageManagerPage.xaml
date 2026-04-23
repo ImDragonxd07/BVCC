@@ -461,6 +461,108 @@
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center"
                         Orientation="Horizontal">
+                        <CheckBox
+                            x:Name="ToggleDetailsBtn"
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center"
+                            Click="ToggleDetailsBtn_Click"
+                            IsChecked="True">
+                            <CheckBox.Template>
+                                <ControlTemplate TargetType="CheckBox">
+                                    <TextBlock
+                                        x:Name="Icon"
+                                        VerticalAlignment="Center"
+                                        FontFamily="Segoe MDL2 Assets"
+                                        FontSize="12"
+                                        Foreground="White"
+                                        Opacity="0.5"
+                                        Text="&#xE76C;" />
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="False">
+                                            <Setter TargetName="Icon" Property="Text" Value="&#xE76B;" />
+                                            <Setter TargetName="Icon" Property="Opacity" Value="0.2" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Icon" Property="Opacity" Value="1" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </CheckBox.Template>
+                        </CheckBox>
+
+                        <StackPanel
+                            x:Name="DetailsStrip"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Visibility="{Binding IsChecked, ElementName=ToggleDetailsBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+                            <StackPanel Margin="5,0,12,0" Orientation="Horizontal">
+                                <TextBlock
+                                    Margin="0,2,6,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="11"
+                                    Foreground="#FF0099FF"
+                                    Text="&#xE898;" />
+                                <TextBlock
+                                    x:Name="UploadStatusText"
+                                    VerticalAlignment="Center"
+                                    FontSize="10"
+                                    FontWeight="SemiBold"
+                                    Foreground="#AAFFFFFF"
+                                    Text="Ready" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,15,0" Orientation="Horizontal">
+                                <TextBlock
+                                    x:Name="VrcContentNameText"
+                                    MaxWidth="100"
+                                    VerticalAlignment="Center"
+                                    FontSize="10"
+                                    Foreground="#66FFFFFF"
+                                    Text="Fetching Name..." />
+                            </StackPanel>
+
+                            <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                <TextBlock
+                                    x:Name="WinIcon"
+                                    Margin="8,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="12"
+                                    Foreground="#FF0099FF"
+                                    Text="&#xE7F8;"
+                                    ToolTip="PC Version Available"
+                                    Visibility="Collapsed" />
+                                <TextBlock
+                                    x:Name="IOSIcon"
+                                    Margin="8,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="12"
+                                    Foreground="White"
+                                    Text="&#xE8EA;"
+                                    ToolTip="Quest/VR Version Available"
+                                    Visibility="Collapsed" />
+
+                                <TextBlock
+                                    x:Name="AndroidIcon"
+                                    Margin="8,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="12"
+                                    Foreground="#FFA4C639"
+                                    Text="&#xE91B;"
+                                    ToolTip="Android Version Available"
+                                    Visibility="Collapsed" />
+                            </StackPanel>
+
+                            <Rectangle
+                                Width="1"
+                                Height="16"
+                                Margin="10,0,15,0"
+                                Fill="#22FFFFFF" />
+                        </StackPanel>
 
                         <Button
                             x:Name="UnityVersionText"

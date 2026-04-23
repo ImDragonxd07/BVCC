@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Microsoft.Win32;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -8,7 +9,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using System.Web.UI;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -190,12 +190,11 @@ namespace BVCC
 
         private void BrowseProjectPath_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog();
-            dialog.SelectedPath = projectpath;
-
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            OpenFolderDialog dialog = new OpenFolderDialog();
+            dialog.ShowDialog();
+            if (Directory.Exists(dialog.FolderName))
             {
-                projectpath = dialog.SelectedPath;
+                projectpath = dialog.FolderName;
                 ProjectNameBox_TextChanged(null, null);
             }
         }

@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -10,12 +11,15 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.ConstrainedExecution;
 using System.Security.Policy;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media.Animation;
 using VRChat.API.Model;
+using static BVCC.CustomDialog;
 using static BVCC.Data;
 using static BVCC.Data.ProjectPackage;
 using File = System.IO.File;
@@ -567,57 +571,150 @@ namespace BVCC
         }
         private async void RefreshDetailStrip()
         {
+            if (!App.savedata.ShowUploadDetailsBar)
+            {
+                DetailsStrip.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                DetailsStrip.Visibility = Visibility.Visible;
+            }
             if (App.api == null || !App.api.IsLoggedIn || currentproject == null) return;
 
             try
             {
                 var vrcInfo = await UnityHelper.ExtractVRCInfo(currentproject.ProjectPath);
-                WinIcon.Visibility = Visibility.Collapsed;
-                IOSIcon.Visibility = Visibility.Collapsed;
-                AndroidIcon.Visibility = Visibility.Collapsed;
 
+                WinGroup.Visibility = Visibility.Collapsed;
+                IOSGroup.Visibility = Visibility.Collapsed;
+                AndroidGroup.Visibility = Visibility.Collapsed;
                 if (vrcInfo.VrcId.StartsWith("wrld_"))
                 {
+                    ContentTypeAvatar.Visibility = Visibility.Collapsed;
+                    ContentTypeWorld.Visibility = Visibility.Visible;
                     var world = await App.api.GetWorldAsync(vrcInfo.VrcId);
+                    LastUploadText.Text = world.UpdatedAt.ToString("g");
                     VrcContentNameText.Text = world.Name;
                     UploadStatusText.Text = world.ReleaseStatus.ToString();
-
                     UpdatePlatformIcons(world.UnityPackages);
                 }
                 else if (vrcInfo.VrcId.StartsWith("avtr_"))
                 {
+                    ContentTypeAvatar.Visibility = Visibility.Visible;
+                    ContentTypeWorld.Visibility = Visibility.Collapsed;
                     var avatar = await App.api.GetAvatarAsync(vrcInfo.VrcId);
+                    LastUploadText.Text = avatar.UpdatedAt.ToString("g");
                     VrcContentNameText.Text = avatar.Name;
                     UploadStatusText.Text = avatar.ReleaseStatus.ToString();
-
                     UpdatePlatformIcons(avatar.UnityPackages);
                 }
             }
-            catch { VrcContentNameText.Text = "Offline / Not Owner"; }
+            catch
+            {
+                VrcContentNameText.Text = "Offline / Not Owner";
+                WinGroup.Visibility = Visibility.Collapsed;
+                IOSGroup.Visibility = Visibility.Collapsed;
+                AndroidGroup.Visibility = Visibility.Collapsed;
+            }
         }
 
-        private void UpdatePlatformIcons(List<UnityPackage> packages)
+        private async Task UpdatePlatformIcons(List<UnityPackage> packages)
         {
-            if (packages == null) return;
+            WinGroup.Visibility = IOSGroup.Visibility = AndroidGroup.Visibility = Visibility.Collapsed;
+            var client = App.api._client.HttpClient;
 
-            foreach (var pkg in packages)
+            foreach (var package in packages)
             {
-                string platform = pkg.Platform.ToLower();
+                if (package.Variant == "impostor") continue;
 
-                if (platform.Contains("windows"))
+                long bytes = 0, uncompressedBytes = 0;
+                string toolTipContent = "No analysis data available";
+
+                try
                 {
-                    WinIcon.Visibility = Visibility.Visible;
+                    string[] parts = package.AssetUrl.Split('/');
+                    string analysisUrl = $"https://api.vrchat.cloud/api/1/analysis/{parts[6]}/{parts[7]}/security";
+
+                    var request = new HttpRequestMessage(HttpMethod.Get, analysisUrl);
+                    request.Headers.Add("User-Agent", $"{App.savedata.AppName}/{App.savedata.AppVersion}");
+
+                    var response = await client.SendAsync(request);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync();
+                        var data = Newtonsoft.Json.JsonConvert.DeserializeObject<Newtonsoft.Json.Linq.JObject>(json);
+
+                        bytes = (long)(data["fileSize"] ?? 0);
+                        uncompressedBytes = (long)(data["uncompressedSize"] ?? 0);
+
+                        var sb = new System.Text.StringBuilder();
+                        FormatJToken(sb, data, 0);
+                        toolTipContent = sb.ToString().TrimEnd();
+                    }
                 }
-                else if (platform.Contains("android"))
+                catch (Exception ex) { Debug.WriteLine($"[API Error] {ex.Message}"); }
+
+                string size = bytes > 0 ? FormatBytes(bytes) : "---";
+                string sizeUn = uncompressedBytes > 0 ? FormatBytes(uncompressedBytes) : "---";
+                string platform = package.Platform.ToLower();
+
+                if (platform.Contains("windows")) UpdateGroup(WinGroup, WinSizeText, WinUncompressedSizeText, size, sizeUn, toolTipContent);
+                else if (platform.Contains("android")) UpdateGroup(AndroidGroup, AndroidSizeText, AndroidUncompressedSizeText, size, sizeUn, toolTipContent);
+                else if (platform.Contains("ios")) UpdateGroup(IOSGroup, IOSSizeText, IOSUncompressedSizeText, size, sizeUn, toolTipContent);
+            }
+        }
+
+        private void FormatJToken(System.Text.StringBuilder sb, Newtonsoft.Json.Linq.JToken token, int indent)
+        {
+            string indentStr = new string(' ', indent * 2);
+
+            if (token is Newtonsoft.Json.Linq.JObject obj)
+            {
+                foreach (var prop in obj.Properties())
                 {
-                    AndroidIcon.Visibility = Visibility.Visible;
-                }
-                else if (platform.Contains("ios"))
-                {
-                    IOSIcon.Visibility = Visibility.Visible;
+                    if (prop.Value is Newtonsoft.Json.Linq.JValue val)
+                    {
+                        string name = prop.Name;
+                        string valueText = val.ToString();
+
+                        if (name.ToLower().Contains("size") || name.ToLower().Contains("memory"))
+                        {
+                            if (long.TryParse(valueText, out long b)) valueText = FormatBytes(b);
+                        }
+
+                        sb.AppendLine($"{indentStr}{name}: {valueText}");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"{indentStr}{prop.Name}:");
+                        FormatJToken(sb, prop.Value, indent + 1);
+                    }
                 }
             }
         }
+
+        private static string FormatBytes(long bytes)
+        {
+            string[] Suffix = { "B", "KB", "MB", "GB" };
+            int i = 0;
+            double dblSByte = bytes;
+            while (dblSByte >= 1024 && i < Suffix.Length - 1)
+            {
+                i++;
+                dblSByte /= 1024;
+            }
+            return $"{dblSByte:F2} {Suffix[i]}";
+        }
+
+        private void UpdateGroup(StackPanel group, TextBlock sText, TextBlock uText, string s, string u, string json)
+        {
+            group.Visibility = Visibility.Visible;
+            sText.Text = s;
+            uText.Text = u;
+            ToolTipService.SetToolTip(group, json);
+        }
+
+
         private void ApplyFilter()
         {
 

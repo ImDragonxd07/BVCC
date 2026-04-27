@@ -863,6 +863,26 @@
                                         FontSize="13"
                                         FontWeight="SemiBold"
                                         Foreground="White"
+                                        Text="Show upload details bar" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Display the upload details bar at the bottom of the window" />
+                                </StackPanel>
+                                <CheckBox
+                                    x:Name="ShowUploadDetailsBarCheckBox"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="ShowUploadDetailsBarCheckBox_Click"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
                                         Text="App Version" />
                                     <TextBlock
                                         FontSize="10"

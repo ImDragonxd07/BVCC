@@ -20,7 +20,7 @@ namespace BVCC
         {
             _tfaCompletionSource?.TrySetCanceled();
         }
-        private IVRChat _client;
+        public IVRChat _client;
         private readonly string _username;
         private readonly string _password;
         private DateTime _lastRequestTime = DateTime.MinValue;

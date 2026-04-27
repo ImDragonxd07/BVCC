@@ -30,6 +30,7 @@ namespace BVCC
             public bool VrcAutoLogin { get; set; } = true;
             public bool CheckForUpdates { get; set; } = true;
             public bool ShowPreReleases { get; set; } = true;
+            public bool ShowUploadDetailsBar { get; set; } = true;
             public bool OpenUnityAfterProjectCreation { get; set; } = false;
             public bool SwipeOnProjectClone { get; set; }  = true;
             public List<RepoItem> Repositories { get; set; } = new List<RepoItem>();

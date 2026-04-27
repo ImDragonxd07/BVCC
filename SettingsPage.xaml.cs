@@ -58,6 +58,7 @@ namespace BVCC
             CheckForUpdatesCheckBox.IsChecked = App.savedata.CheckForUpdates;
             SwipeBackupClone.IsChecked = App.savedata.SwipeOnProjectClone;
             VrcAutoLoginCheckBox.IsChecked = App.savedata.VrcAutoLogin;
+            ShowUploadDetailsBarCheckBox.IsChecked = App.savedata.ShowUploadDetailsBar;
             UpdateVrcLoginState();
         }
 
@@ -649,6 +650,16 @@ namespace BVCC
             _pendingApi?.Cancel2FA();
             VrcTwoFactorPanel.Visibility = Visibility.Collapsed;
             VrcLoginPanel.Visibility = Visibility.Visible;
+        }
+
+        private void ShowUploadDetailsBarCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.savedata == null) return;
+            CheckBox checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+            App.savedata.ShowUploadDetailsBar = checkBox.IsChecked == true;
+            App.SaveToDisk();
+            
         }
     }
 }

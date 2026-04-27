@@ -565,11 +565,19 @@ namespace BVCC
             {
                 SetLoadingState(false);
             }
-            RefreshDetailStrip();
-            //UnityHelper.ExtractVRCInfo(currentproject.ProjectPath);
+            try
+            {
+                _ = RefreshDetailStripAsync();
 
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RefreshDetailStrip Error: {ex.Message}");
+                CustomDialog.Show("Failed to load upload details. You might be offline or not the owner of the content.", App.savedata.AppName, CustomDialog.Mode.Message);
+            }
         }
-        private async void RefreshDetailStrip()
+
+        private async Task RefreshDetailStripAsync()
         {
             if (!App.savedata.ShowUploadDetailsBar)
             {

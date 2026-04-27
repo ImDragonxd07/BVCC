@@ -74,34 +74,52 @@ namespace BVCC
             {
                 var cookies = LoadSessionCookies();
                 if (cookies == null || cookies.Count == 0)
+                {
+                    DeleteSession();
                     return (false, "Session file is empty or corrupted.");
+                }
+
                 var authCookie = cookies.FirstOrDefault(c => c.Name == "auth");
                 var twoFactorCookie = cookies.FirstOrDefault(c => c.Name == "twoFactorAuth");
+
                 if (authCookie == null || string.IsNullOrWhiteSpace(authCookie.Value))
+                {
+                    DeleteSession();
                     return (false, "Missing auth cookie (session expired).");
+                }
+
                 _client = BuildClient(authCookie.Value, twoFactorCookie?.Value);
                 var user = await _client.Authentication.GetCurrentUserAsync();
+
                 if (user == null)
+                {
+                    DeleteSession();
                     return (false, "API returned null user (invalid session).");
-                if (user.RequiresTwoFactorAuth != null &&
-                    user.RequiresTwoFactorAuth.Count > 0)
+                }
+
+                if (user.RequiresTwoFactorAuth != null && user.RequiresTwoFactorAuth.Count > 0)
                 {
                     DeleteSession();
                     return (false, "Session requires 2FA again (expired session).");
                 }
+
                 IsLoggedIn = true;
                 CurrentUserName = user.DisplayName;
                 return (true, $"Session restored as {CurrentUserName}");
             }
             catch (VRChat.API.Client.ApiException ex)
             {
-                DeleteSession();
+                if (ex.ErrorCode == 401 || ex.ErrorCode == 403)
+                {
+                    DeleteSession();
+                    return (false, $"Session expired ({ex.ErrorCode}), please log in again.");
+                }
                 return (false, $"VRChat API error {ex.ErrorCode}: {ex.Message}");
             }
             catch (Exception ex)
             {
-                DeleteSession();
-                return (false, $"Unexpected error: {ex.Message}");
+                Debug.WriteLine($"Session restore failed (non-auth): {ex.Message}");
+                return (false, $"Could not reach VRChat: {ex.Message}");
             }
         }
         public void Logout()
@@ -208,6 +226,8 @@ namespace BVCC
         }
         private static void DeleteSession()
         {
+            App.savedata.VrcAutoLogin = false;
+            App.SaveToDisk();
             try { if (File.Exists(SessionFile)) File.Delete(SessionFile); }
             catch { }
         }

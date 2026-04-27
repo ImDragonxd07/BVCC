@@ -16,7 +16,6 @@ C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\CustomDial
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\NewFromTemplate.baml
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\ProjectsPage.baml
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\SplashScreen.baml
-C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\TwoFactorWindow.baml
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\CustomDialog.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\NewFromTemplate.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\NewProjectSettingsPage.g.cs
@@ -25,7 +24,6 @@ C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\ProjectBac
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\ProjectsPage.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\SettingsPage.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\SplashScreen.g.cs
-C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\TwoFactorWindow.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\App.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\BVCC_Content.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\GeneratedInternalTypeHelper.g.cs

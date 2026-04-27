@@ -81,7 +81,7 @@ namespace BVCC
             public string Name { get; set; }
             public string Url { get; set; }
             public string LocalPath { get; set; }
-            public string Id { get; internal set; }
+            public string Id { get; set; }
         }
 
         public class ProjectPackage : INotifyPropertyChanged

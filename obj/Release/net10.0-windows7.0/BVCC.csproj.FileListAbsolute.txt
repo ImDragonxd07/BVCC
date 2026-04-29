@@ -46,3 +46,4 @@ C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\refint\BVC
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\BVCC.pdb
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\BVCC.genruntimeconfig.cache
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Release\net10.0-windows7.0\ref\BVCC.dll
+C:\Users\stupid\source\repos\BVCC\BVCC\bin\Release\net10.0-windows7.0\CredentialManagement.dll

@@ -24,6 +24,7 @@
 
   <!-- NuGet packages (replaces packages.config + all manual <Reference> HintPaths) -->
   <ItemGroup>
+    <PackageReference Include="CredentialManagement" Version="1.0.2" />
     <PackageReference Include="JsonSubTypes" Version="2.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Polly" Version="8.6.6" />

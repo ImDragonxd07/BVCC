@@ -16,7 +16,6 @@ C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\CustomDialog
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\NewFromTemplate.baml
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\ProjectsPage.baml
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\SplashScreen.baml
-C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\TwoFactorWindow.baml
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\CustomDialog.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\NewFromTemplate.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\NewProjectSettingsPage.g.cs
@@ -25,7 +24,6 @@ C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\ProjectBacku
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\ProjectsPage.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\SettingsPage.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\SplashScreen.g.cs
-C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\TwoFactorWindow.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\App.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\BVCC_Content.g.cs
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\GeneratedInternalTypeHelper.g.cs
@@ -48,3 +46,4 @@ C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\refint\BVCC.
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\BVCC.pdb
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\BVCC.genruntimeconfig.cache
 C:\Users\stupid\source\repos\BVCC\BVCC\obj\Debug\net10.0-windows7.0\ref\BVCC.dll
+C:\Users\stupid\source\repos\BVCC\BVCC\bin\Debug\net10.0-windows7.0\CredentialManagement.dll

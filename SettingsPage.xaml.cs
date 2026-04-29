@@ -575,11 +575,12 @@ namespace BVCC
             App.SaveToDisk();
         }
 
-        private void UpdateVrcLoginState()
+        public void UpdateVrcLoginState()
         {
             bool loggedIn = App.api?.IsLoggedIn == true;
             VrcLoggedInPanel.Visibility = loggedIn ? Visibility.Visible : Visibility.Collapsed;
             VrcLoginPanel.Visibility = loggedIn ? Visibility.Collapsed : Visibility.Visible;
+            VrcAutoLoginCheckBox.IsChecked = App.savedata.VrcAutoLogin;
 
             VrcUsernameText.Text = loggedIn
                 ? App.api?.CurrentUserName ?? ""
@@ -590,15 +591,6 @@ namespace BVCC
         {
             App.api?.Logout();
 
-            App.api = null;
-
-            if (File.Exists("session.dat"))
-                File.Delete("session.dat");
-
-            App.savedata.VrcEmail = "";
-            App.SaveToDisk();
-
-            UpdateVrcLoginState();
         }
 
         private async void VrcLoginBtn_Click(object sender, RoutedEventArgs e)

@@ -3,6 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Windows.Input;
 using VRChat.API.Api;
 using VRChat.API.Client;
 using VRChat.API.Model;
@@ -11,6 +12,7 @@ namespace BVCC
 {
     public class VRCApi
     {
+        private CredentialStore store = new CredentialStore();
         private TaskCompletionSource<string> _tfaCompletionSource;
         public void Provide2FACode(string code)
         {
@@ -25,10 +27,6 @@ namespace BVCC
         private readonly string _password;
         private DateTime _lastRequestTime = DateTime.MinValue;
         private static readonly TimeSpan MinDelay = TimeSpan.FromMilliseconds(400);
-        private static readonly string SessionFile = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            "session.dat"
-        );
         private readonly Dictionary<string, Avatar> _avatarCache = new();
         public bool IsLoggedIn { get; private set; }
         public string CurrentUserName { get; private set; } = string.Empty;
@@ -68,27 +66,15 @@ namespace BVCC
         }
         public async Task<(bool success, string message)> TryRestoreSessionAsync()
         {
-            if (!File.Exists(SessionFile))
-                return (false, "No session file found.");
+            var auth = store.LoadToken("auth");
+            if (auth == null)
+                return (false, "No saved session found.");
+
+            var twoFactor = store.LoadToken("twofactor");
+
             try
             {
-                var cookies = LoadSessionCookies();
-                if (cookies == null || cookies.Count == 0)
-                {
-                    DeleteSession();
-                    return (false, "Session file is empty or corrupted.");
-                }
-
-                var authCookie = cookies.FirstOrDefault(c => c.Name == "auth");
-                var twoFactorCookie = cookies.FirstOrDefault(c => c.Name == "twoFactorAuth");
-
-                if (authCookie == null || string.IsNullOrWhiteSpace(authCookie.Value))
-                {
-                    DeleteSession();
-                    return (false, "Missing auth cookie (session expired).");
-                }
-
-                _client = BuildClient(authCookie.Value, twoFactorCookie?.Value);
+                _client = BuildClient(auth, twoFactor);
                 var user = await _client.Authentication.GetCurrentUserAsync();
 
                 if (user == null)
@@ -118,17 +104,21 @@ namespace BVCC
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Session restore failed (non-auth): {ex.Message}");
+                Debug.WriteLine($"Session restore failed: {ex.Message}");
                 return (false, $"Could not reach VRChat: {ex.Message}");
             }
         }
         public void Logout()
         {
+
             IsLoggedIn = false;
             CurrentUserName = string.Empty;
             _avatarCache.Clear();
             DeleteSession();
             _client = BuildClient();
+            App.api = null;
+            App.savedata.VrcEmail = "";
+            App.SaveToDisk();
         }
         public async Task<User> GetUserAsync(string userId)
         {
@@ -192,23 +182,22 @@ namespace BVCC
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(SessionFile)!);
-                var cookies = _client.GetCookies()
-                    .Select(c => new SavedCookie
-                    {
-                        Name = c.Name,
-                        Value = c.Value,
-                        Domain = c.Domain,
-                        Path = c.Path
-                    })
-                    .ToList();
-                var json = JsonSerializer.Serialize(cookies);
-                var encrypted = ProtectedData.Protect(
-                    Encoding.UTF8.GetBytes(json),
-                    null,
-                    DataProtectionScope.CurrentUser
-                );
-                File.WriteAllBytes(SessionFile, encrypted);
+                var cookies = _client.GetCookies().ToList();
+
+                var auth = cookies.FirstOrDefault(c => c.Name == "auth");
+                var twoFactor = cookies.FirstOrDefault(c => c.Name == "twoFactorAuth");
+
+                if (auth == null || string.IsNullOrWhiteSpace(auth.Value))
+                {
+                    Debug.WriteLine("SaveSession: no auth cookie found");
+                    return;
+                }
+
+                store.SaveToken("auth", auth.Value);
+
+                if (twoFactor != null && !string.IsNullOrWhiteSpace(twoFactor.Value))
+                    store.SaveToken("twofactor", twoFactor.Value);
+
                 Debug.WriteLine("Session saved");
             }
             catch (Exception ex)
@@ -216,21 +205,15 @@ namespace BVCC
                 Debug.WriteLine($"Failed to save session: {ex.Message}");
             }
         }
-        private List<SavedCookie>? LoadSessionCookies()
-        {
-            var encrypted = File.ReadAllBytes(SessionFile);
-            var json = Encoding.UTF8.GetString(
-                ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser)
-            );
-            return JsonSerializer.Deserialize<List<SavedCookie>>(json);
-        }
-        private static void DeleteSession()
+        private void DeleteSession()
         {
             App.savedata.VrcAutoLogin = false;
             App.SaveToDisk();
-            try { if (File.Exists(SessionFile)) File.Delete(SessionFile); }
-            catch { }
+            App.SettingsPage.UpdateVrcLoginState();
+            store.DeleteToken("auth");
+            store.DeleteToken("twofactor");
         }
+
         private async Task ThrottleAsync()
         {
             var elapsed = DateTime.UtcNow - _lastRequestTime;

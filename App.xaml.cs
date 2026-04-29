@@ -110,7 +110,7 @@ namespace BVCC
                 catch (Exception ex)
                 {
                     Console.WriteLine("GitHub API Error: " + ex.Message);
-                    CustomDialog.Show("Failed to check for updates. Please check your internet connection.", "Update Check Failed", CustomDialog.Mode.Message);
+                    CustomDialog.Show("Failed to check for updates. Please check your internet connection or download latest from github.", "Update Check Failed", CustomDialog.Mode.Message);
                     return new List<GitHubRelease>();
                 }
             }
@@ -566,7 +566,7 @@ namespace BVCC
             }
 
             await Task.Delay(500);
-
+            LegacyChecks.OnInit();  
             splash.Hide();
             System.Windows.Application.Current.MainWindow = ProjectsPage;
             ProjectsPage.Show();

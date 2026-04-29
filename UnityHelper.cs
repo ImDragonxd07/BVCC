@@ -16,6 +16,49 @@ namespace BVCC
             var clean = v.Split('-')[0];
             return Version.TryParse(clean, out var parsed) ? parsed : new Version(0, 0);
         }
+        public static bool VersionSatisfies(string installedVersion, string requirement)
+        {
+            if (string.IsNullOrEmpty(requirement)) return true;
+            if (string.IsNullOrEmpty(installedVersion)) return false;
+
+            var installed = UnityHelper.ParseVersion(installedVersion);
+
+            if (requirement.StartsWith(">="))
+            {
+                var required = UnityHelper.ParseVersion(requirement.Substring(2).Trim());
+                return installed >= required;
+            }
+            if (requirement.StartsWith("^"))
+            {
+                var required = UnityHelper.ParseVersion(requirement.Substring(1).Trim());
+                return installed.Major == required.Major && installed >= required;
+            }
+            if (requirement.StartsWith("~"))
+            {
+                var required = UnityHelper.ParseVersion(requirement.Substring(1).Trim());
+                return installed.Major == required.Major &&
+                       installed.Minor == required.Minor &&
+                       installed >= required;
+            }
+            if (requirement.StartsWith(">"))
+            {
+                var required = UnityHelper.ParseVersion(requirement.Substring(1).Trim());
+                return installed > required;
+            }
+            var exact = UnityHelper.ParseVersion(requirement.TrimStart('=').Trim());
+            return installed == exact;
+        }
+
+        public static string FindSatisfyingVersion(List<string> versions, string requirement)
+        {
+            if (versions == null || versions.Count == 0) return null;
+
+            // Return highest version that satisfies the requirement
+            return versions
+                .Where(v => VersionSatisfies(v, requirement))
+                .OrderByDescending(v => UnityHelper.ParseVersion(v))
+                .FirstOrDefault();
+        }
         public class UnityVrcInfo
         {
             public string SceneName { get; set; }

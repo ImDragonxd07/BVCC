@@ -2,6 +2,15 @@
   "version": 3,
   "targets": {
     "net10.0-windows7.0": {
+      "CredentialManagement/1.0.2": {
+        "type": "package",
+        "compile": {
+          "lib/net35/CredentialManagement.dll": {}
+        },
+        "runtime": {
+          "lib/net35/CredentialManagement.dll": {}
+        }
+      },
       "JsonSubTypes/2.0.1": {
         "type": "package",
         "dependencies": {
@@ -107,6 +116,18 @@
     }
   },
   "libraries": {
+    "CredentialManagement/1.0.2": {
+      "sha512": "VkP04/jFXaxT3TkcRhzETYtOrznQxRmQ2J1XJdbXz47Bir7hIzPR7mFZk4GJQ4An4gozW+vonpf+iqTHomAkQw==",
+      "type": "package",
+      "path": "credentialmanagement/1.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "credentialmanagement.1.0.2.nupkg.sha512",
+        "credentialmanagement.nuspec",
+        "lib/net35/CredentialManagement.dll"
+      ]
+    },
     "JsonSubTypes/2.0.1": {
       "sha512": "1Po+Ypf0SjCeEKx5+C89Nb5OgTcqNvfS3uTI46MUM+KEp6Rq/M0h+vVsTUt/6DFRwZMTpsAJM4yJrZmEObVANA==",
       "type": "package",
@@ -277,6 +298,7 @@
   },
   "projectFileDependencyGroups": {
     "net10.0-windows7.0": [
+      "CredentialManagement >= 1.0.2",
       "JsonSubTypes >= 2.0.1",
       "Newtonsoft.Json >= 13.0.3",
       "Polly >= 8.6.6",
@@ -334,6 +356,10 @@
       "net10.0-windows7.0": {
         "targetAlias": "net10.0-windows7.0",
         "dependencies": {
+          "CredentialManagement": {
+            "target": "Package",
+            "version": "[1.0.2, )"
+          },
           "JsonSubTypes": {
             "target": "Package",
             "version": "[2.0.1, )"
@@ -667,5 +693,17 @@
         }
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1701",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Package 'CredentialManagement 1.0.2' was restored using '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' instead of the project target framework 'net10.0-windows7.0'. This package may not be fully compatible with your project.",
+      "libraryId": "CredentialManagement",
+      "targetGraphs": [
+        "net10.0-windows7.0"
+      ]
+    }
+  ]
 }

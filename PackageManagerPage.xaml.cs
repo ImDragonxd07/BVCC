@@ -134,6 +134,7 @@ namespace BVCC
             if (string.IsNullOrEmpty(version)) return;
             currentproject.LastModified = DateTime.Now;
             App.SaveToDisk();
+            App.ProjectsPage.RefreshProjects();
             string packagesPath = Path.Combine(currentproject.ProjectPath, "Packages");
             string manifestPath = Path.Combine(packagesPath, "vpm-manifest.json");
             DriveInfo drive = new DriveInfo(Path.GetPathRoot(currentproject.ProjectPath));
@@ -248,12 +249,47 @@ namespace BVCC
                         foreach (var dep in deps.Properties())
                         {
                             var depPackage = allPackages.FirstOrDefault(p => p.ID == dep.Name);
-
                             if (depPackage == null) continue;
-                            if (depPackage.IsInstalled) continue;
                             if (string.IsNullOrEmpty(depPackage.LatestVersion)) continue;
 
-                            dependenciesToInstall.Add((depPackage, depPackage.LatestVersion));
+                            string requirement = dep.Value.ToString().Trim();
+
+                            if (depPackage.IsInstalled)
+                            {
+                                if (!UnityHelper.VersionSatisfies(depPackage.CurrentVersion, requirement))
+                                {
+                                    string satisfying = UnityHelper.FindSatisfyingVersion(depPackage.VersionList, requirement);
+                                    if (satisfying != null && satisfying != depPackage.CurrentVersion)
+                                    {
+                                        Debug.WriteLine($"[Deps] {depPackage.ID} {depPackage.CurrentVersion} does not satisfy {requirement}, switching to {satisfying}");
+                                        dependenciesToInstall.Add((depPackage, satisfying));
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                string satisfying = UnityHelper.FindSatisfyingVersion(depPackage.VersionList, requirement)
+                                                    ?? depPackage.LatestVersion;
+                                dependenciesToInstall.Add((depPackage, satisfying));
+                            }
+                        }
+                        if (dependenciesToInstall.Count > 0)
+                        {
+                            var sb = new System.Text.StringBuilder();
+                            sb.AppendLine("The following dependencies will be changed:\n");
+
+                            foreach (var dep in dependenciesToInstall)
+                            {
+                                if (dep.pkg.IsInstalled)
+                                    sb.AppendLine($"  • {dep.pkg.Name}\n    {dep.pkg.CurrentVersion} → {dep.ver}");
+                                else
+                                    sb.AppendLine($"  • {dep.pkg.Name}\n    Install {dep.ver}");
+                            }
+
+                            sb.AppendLine("\nProceed?");
+
+                            bool confirm = (bool)CustomDialog.Show(sb.ToString(), App.savedata.AppName, CustomDialog.Mode.Question);
+                            if (!confirm) return;
                         }
                     }
                 }

@@ -58,17 +58,37 @@ namespace BVCC
         {
             if (!Directory.Exists(targetDir)) return;
 
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-
-                string[] files = Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories);
-                foreach (string file in files)
-                {
+                foreach (string file in Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories))
                     File.SetAttributes(file, FileAttributes.Normal);
-                    File.Delete(file);
+
+                foreach (string dir in Directory.GetDirectories(targetDir, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(dir, FileAttributes.Normal);
+                var lockedFiles = Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories)
+                    .Where(f => IsFileLocked(new FileInfo(f)))
+                    .ToList();
+                if (lockedFiles.Count > 0)
+                {
+                    string names = string.Join("\n", lockedFiles.Select(f => $"  • {Path.GetFileName(f)}"));
+                    throw new IOException(
+                        $"The following files are in use (is Unity open?):\n{names}\n\nClose Unity and try again.");
                 }
+
+                int attempts = 3;
+                while (attempts-- > 0)
+                {
+                    try
+                    {
+                        Directory.Delete(targetDir, true);
+                        return;
+                    }
+                    catch (IOException) when (attempts > 0) { await Task.Delay(300); }
+                    catch (UnauthorizedAccessException) when (attempts > 0) { await Task.Delay(300); }
+                }
+
                 Directory.Delete(targetDir, true);
             });
         }
@@ -216,13 +236,22 @@ namespace BVCC
 
                 package.InstallProgress = 0.7;
 
-                await Task.Run(async () =>
+                try
                 {
-                    if (Directory.Exists(projectPackagePath))
-                        await DeleteDirectorySafe(projectPackagePath);
+                    await Task.Run(async () =>
+                    {
+                        if (Directory.Exists(projectPackagePath))
+                            await DeleteDirectorySafe(projectPackagePath);
 
-                    ZipFile.ExtractToDirectory(zipPath, projectPackagePath);
-                });
+                        ZipFile.ExtractToDirectory(zipPath, projectPackagePath);
+                    });
+                }
+                catch (IOException ex) when (ex.Message.Contains("in use"))
+                {
+                    CustomDialog.Show(ex.Message, App.savedata.AppName, CustomDialog.Mode.Message);
+                    CustomDialog.Show($"{package.Name} will be skipped", App.savedata.AppName, CustomDialog.Mode.Message);
+                    return;
+                }
 
                 package.InstallProgress = 0.85;
 

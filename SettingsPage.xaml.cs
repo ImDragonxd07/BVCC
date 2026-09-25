@@ -230,7 +230,7 @@ namespace BVCC
                 {
                     ProjectName = Path.GetFileName(property),
                     ProjectPath = property,
-                    LastModified = new DateTime(i),
+                    LastModified = File.GetLastWriteTime(property),
                 });
                 i--;
             }

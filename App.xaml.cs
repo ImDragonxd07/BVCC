@@ -538,6 +538,11 @@ namespace BVCC
                     }
                 }
             }
+            splash.LoadingStatus.Text = "Initializing";
+            ProjectsPage = new ProjectsPage();
+            SettingsPage = new SettingsPage();
+            NewFromTemplatePage = new NewFromTemplate();
+            await EnsureRepoCacheAsync();
             api = new VRCApi(savedata.VrcEmail, "");
             if (savedata.VrcAutoLogin == true && savedata.VrcEmail.Length > 0)
             {
@@ -548,13 +553,8 @@ namespace BVCC
                     api = null;
                     CustomDialog.Show($"Failed to restore VRChat session: {message}", "VRChat Login Failed", CustomDialog.Mode.Message);
                 }
- 
+
             }
-            splash.LoadingStatus.Text = "Initializing";
-            ProjectsPage = new ProjectsPage();
-            SettingsPage = new SettingsPage();
-            NewFromTemplatePage = new NewFromTemplate();
-            await EnsureRepoCacheAsync();
             splash.LoadingStatus.Text = "Register";
             if (!ProtocolInstaller.IsRegistered())
             {

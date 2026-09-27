@@ -59,7 +59,6 @@ namespace BVCC
             SwipeBackupClone.IsChecked = App.savedata.SwipeOnProjectClone;
             VrcAutoLoginCheckBox.IsChecked = App.savedata.VrcAutoLogin;
             ShowUploadDetailsBarCheckBox.IsChecked = App.savedata.ShowUploadDetailsBar;
-            UpdateVrcLoginState();
         }
 
         public async Task<List<RepoItem>> FetchRepoPackagesAsync(string url)
@@ -87,13 +86,14 @@ namespace BVCC
                                    ?? data["displayName"]?.ToString()
                                    ?? Path.GetFileNameWithoutExtension(url);
                     string repoId = data["Id"]?.ToString() ?? data["id"]?.ToString() ?? url;
-
+                    string author = data["author"]?.ToString() ?? "Unknown";
                     return new List<RepoItem>
                     {
                         new RepoItem
                         {
                             Url = url,
                             Id = repoId,
+                            Author = author,
                             Name = repoName
                         }
                     };
@@ -134,6 +134,7 @@ namespace BVCC
                     {
                         repo.Name = freshRepo.Name;
                         repo.Id = freshRepo.Id;
+                        repo.Author = freshRepo.Author;
                     }
                 }
                 await App.EnsureRepoCacheAsync(true);

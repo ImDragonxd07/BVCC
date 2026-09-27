@@ -13,6 +13,7 @@
         <local:InverseBooleanConverter x:Key="InverseBooleanConverter" />
         <local:ActionToColorConverter x:Key="ActionToColorConverter" />
         <local:IsProgressingConverter x:Key="IsProgressingConverter" />
+        <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <Style x:Key="TitleBarButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -832,18 +833,20 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <!--  Top row: Name + warning  -->
+                                    <!--  Top row: Name + warning + changelog  -->
                                     <StackPanel
                                         Grid.Row="0"
                                         VerticalAlignment="Center"
                                         Orientation="Horizontal">
 
+                                        <!--  Package name  -->
                                         <TextBlock
                                             FontSize="14"
                                             FontWeight="Medium"
                                             Foreground="White"
                                             Text="{Binding Name}" />
 
+                                        <!--  Compatibility warning  -->
                                         <TextBlock
                                             Margin="6,0,0,0"
                                             VerticalAlignment="Center"
@@ -857,7 +860,6 @@
                                                 </ToolTip>
                                             </TextBlock.ToolTip>
                                         </TextBlock>
-
                                     </StackPanel>
 
                                     <!--  Bottom row: Version  -->
@@ -879,6 +881,33 @@
                                         SelectedItem="{Binding SelectedVersion}"
                                         SelectionChanged="VersionSelector_SelectionChanged"
                                         Style="{DynamicResource VersionComboBox}" />
+                                    <Button
+                                        Width="26"
+                                        Height="24"
+                                        Margin="0,0,8,0"
+                                        Padding="0"
+                                        VerticalAlignment="Center"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Click="ChangelogBtn_Click"
+                                        Cursor="Hand"
+                                        ToolTip="Open changelog"
+                                        Visibility="{Binding changelogUrl, Converter={StaticResource StringToVisibilityConverter}}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <ContentPresenter
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Opacity="0.5" />
+                                            </ControlTemplate>
+                                        </Button.Template>
+
+                                        <TextBlock
+                                            FontFamily="Segoe MDL2 Assets"
+                                            FontSize="17"
+                                            Foreground="White"
+                                            Text="&#xE71D;" />
+                                    </Button>
                                     <Button
                                         Width="85"
                                         Margin="0,0,8,0"

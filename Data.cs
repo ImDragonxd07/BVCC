@@ -79,6 +79,7 @@ namespace BVCC
         public class RepoItem
         {
             public string Name { get; set; }
+            public string Author { get; set; }
             public string Url { get; set; }
             public string LocalPath { get; set; }
             public string Id { get; set; }
@@ -89,7 +90,7 @@ namespace BVCC
             public string ID { get; set; }
             public string Name { get; set; }
             public string DownloadUrl { get; set; }
-
+            public string changelogUrl { get; set; }
             // Versions
             private string _currentVersion;
             public string CurrentVersion

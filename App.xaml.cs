@@ -555,6 +555,7 @@ namespace BVCC
                 }
 
             }
+            SettingsPage.UpdateVrcLoginState();
             splash.LoadingStatus.Text = "Register";
             if (!ProtocolInstaller.IsRegistered())
             {

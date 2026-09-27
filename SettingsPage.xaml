@@ -427,13 +427,21 @@
                                 x:Name="RepoListBox"
                                 MaxHeight="220"
                                 Margin="0,0,0,15"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Top"
                                 Background="Transparent"
                                 BorderThickness="0"
+                                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                                 VirtualizingStackPanel.IsVirtualizing="True">
 
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="VerticalContentAlignment" Value="Top" />
+
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="ListBoxItem">
@@ -453,19 +461,53 @@
                                             BorderBrush="#FF333333"
                                             BorderThickness="1"
                                             CornerRadius="8">
+
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
 
-                                                <TextBlock
-                                                    VerticalAlignment="Center"
-                                                    FontSize="11"
-                                                    Foreground="White"
-                                                    Text="{Binding Name}"
-                                                    TextTrimming="CharacterEllipsis" />
+                                                <!--  Repository info  -->
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
 
+                                                    <!--  Name  -->
+                                                    <TextBlock
+                                                        FontSize="11"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="White"
+                                                        Text="{Binding Name}"
+                                                        TextTrimming="CharacterEllipsis" />
+
+                                                    <!--  Author  -->
+                                                    <TextBlock
+                                                        Margin="0,3,0,0"
+                                                        FontSize="9"
+                                                        Foreground="#FF888888"
+                                                        Text="{Binding Author}"
+                                                        TextTrimming="CharacterEllipsis">
+
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Visible" />
+
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Author}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+
+                                                                    <DataTrigger Binding="{Binding Author}" Value="{x:Null}">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+
+                                                    </TextBlock>
+
+                                                </StackPanel>
+
+                                                <!--  Remove button  -->
                                                 <Button
                                                     Grid.Column="1"
                                                     Width="75"
@@ -476,10 +518,12 @@
                                                     Content="REMOVE"
                                                     FontSize="9"
                                                     Style="{StaticResource PillButton}" />
+
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
+
                             </ListBox>
 
                             <Grid>

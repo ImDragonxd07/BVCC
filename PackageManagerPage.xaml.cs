@@ -485,11 +485,11 @@ namespace BVCC
                             var rawVersion = prop.Value["version"]?.ToString();
                             bool isLocal = !string.IsNullOrEmpty(rawVersion) && rawVersion.StartsWith("file:");
                             var cleanedVersion = isLocal ? null : rawVersion;
-
                             var package = new ProjectPackage()
                             {
                                 ID = prop.Name,
                                 Name = prop.Name,
+                                changelogUrl = prop.Value["changelogUrl"]?.ToString(),
                                 CurrentVersion = cleanedVersion,
                                 SelectedVersion = rawVersion,
                                 IsInstalled = true,
@@ -581,6 +581,7 @@ namespace BVCC
                                 {
                                     ID = pkg.Name,
                                     Name = versions[latestVer]?["displayName"]?.ToString() ?? pkg.Name,
+                                    changelogUrl = versions[latestVer]?["changelogUrl"]?.ToString(),
                                     IsInstalled = false,
                                     LatestVersion = latestVer,
                                     VersionList = sorted,
@@ -1162,6 +1163,33 @@ namespace BVCC
         {
             CheckBox checkBox = sender as CheckBox;
             DetailsStrip.Visibility = checkBox.IsChecked == true && App.api.IsLoggedIn ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ChangelogBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+                return;
+
+            if (button.DataContext is not ProjectPackage package)
+                return;
+
+            string url = package.changelogUrl;
+
+            if (string.IsNullOrWhiteSpace(url))
+                return;
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
+                return;
+
+            if (uri.Scheme != Uri.UriSchemeHttp &&
+                uri.Scheme != Uri.UriSchemeHttps)
+                return;
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = uri.ToString(),
+                UseShellExecute = true
+            });
         }
     }
 }

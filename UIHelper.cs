@@ -26,7 +26,6 @@ namespace BVCC
         {
             if (Application.Current.MainWindow is ProjectsPage mainWin)
             {
-                // 1. Record history if this is a forward navigation
                 if (!goingBack && !_isNavigatingInternal)
                 {
                     if (mainWin.ViewA.Content != null)
@@ -35,7 +34,6 @@ namespace BVCC
                     }
                 }
 
-                // --- Your existing Title Logic ---
                 string title;
                 switch (newContent)
                 {
@@ -46,14 +44,18 @@ namespace BVCC
                     case ProjectBackupPage _: title = "PROJECT BACKUPS"; break;
                     default: title = "PROJECTS"; break;
                 }
-
+                if(newContent.GetType() != typeof(PackageManagerPage))
+                {
+                    // only show static text for non projects
+                    RichPresence.DetailText = $"In {title}";
+                    RichPresence.Update();
+                }
                 App.ProjectsPage.SubHeaderText.Text = title;
 
-                // --- Your Animation Logic ---
                 if (mainWin.ViewA.Content == newContent) mainWin.ViewA.Content = null;
                 if (mainWin.ViewB.Content == newContent) mainWin.ViewB.Content = null;
 
-                double aExitPos = goingBack ? 1200 : -1200; // I bumped this to 1200 to ensure clear exit
+                double aExitPos = goingBack ? 1200 : -1200;
                 double bStartPos = goingBack ? -1200 : 1200;
 
                 Duration duration = new Duration(TimeSpan.FromSeconds(0.4));

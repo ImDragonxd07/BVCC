@@ -48,6 +48,7 @@ namespace BVCC
             InitializeComponent();
             _loadingOverlay = LoadingOverlay;
             UpdateSortButtonStyles();
+
         }
         public void ClearRepoCache()
         {
@@ -455,6 +456,9 @@ namespace BVCC
 
             currentproject = project;
             ProjectTitleText.Text = project.ProjectName;
+            RichPresence.ResetTime();
+            RichPresence.DetailText = $"Working on {project.ProjectName ?? "Unknown Project"}";
+            RichPresence.Update();
             SetLoadingState(true);
 
             try

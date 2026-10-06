@@ -11,6 +11,22 @@
           "lib/net35/CredentialManagement.dll": {}
         }
       },
+      "DiscordRichPresence/1.6.1.70": {
+        "type": "package",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1"
+        },
+        "compile": {
+          "lib/net9.0/DiscordRPC.dll": {
+            "related": ".deps.json;.pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/DiscordRPC.dll": {
+            "related": ".deps.json;.pdb;.xml"
+          }
+        }
+      },
       "JsonSubTypes/2.0.1": {
         "type": "package",
         "dependencies": {
@@ -126,6 +142,28 @@
         "credentialmanagement.1.0.2.nupkg.sha512",
         "credentialmanagement.nuspec",
         "lib/net35/CredentialManagement.dll"
+      ]
+    },
+    "DiscordRichPresence/1.6.1.70": {
+      "sha512": "yho1fdhbsedICHdfHe/Tu3IX6a5oj4fiPFL0keZStlsh7T/FrdjcwZZ7C1uC2HUvcXbFh+VEJvcbo1W66QtkUg==",
+      "type": "package",
+      "path": "discordrichpresence/1.6.1.70",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "discordrichpresence.1.6.1.70.nupkg.sha512",
+        "discordrichpresence.nuspec",
+        "lib/net45/DiscordRPC.dll",
+        "lib/net45/DiscordRPC.pdb",
+        "lib/net45/DiscordRPC.xml",
+        "lib/net9.0/DiscordRPC.deps.json",
+        "lib/net9.0/DiscordRPC.dll",
+        "lib/net9.0/DiscordRPC.pdb",
+        "lib/net9.0/DiscordRPC.xml",
+        "lib/netstandard2.0/DiscordRPC.dll",
+        "lib/netstandard2.0/DiscordRPC.pdb",
+        "lib/netstandard2.0/DiscordRPC.xml"
       ]
     },
     "JsonSubTypes/2.0.1": {
@@ -299,6 +337,7 @@
   "projectFileDependencyGroups": {
     "net10.0-windows7.0": [
       "CredentialManagement >= 1.0.2",
+      "DiscordRichPresence >= 1.6.1.70",
       "JsonSubTypes >= 2.0.1",
       "Newtonsoft.Json >= 13.0.3",
       "Polly >= 8.6.6",
@@ -361,6 +400,10 @@
           "CredentialManagement": {
             "target": "Package",
             "version": "[1.0.2, )"
+          },
+          "DiscordRichPresence": {
+            "target": "Package",
+            "version": "[1.6.1.70, )"
           },
           "JsonSubTypes": {
             "target": "Package",

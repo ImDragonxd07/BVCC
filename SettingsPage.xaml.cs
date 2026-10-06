@@ -59,6 +59,7 @@ namespace BVCC
             SwipeBackupClone.IsChecked = App.savedata.SwipeOnProjectClone;
             VrcAutoLoginCheckBox.IsChecked = App.savedata.VrcAutoLogin;
             ShowUploadDetailsBarCheckBox.IsChecked = App.savedata.ShowUploadDetailsBar;
+            RichPresenceCheckBox.IsChecked = App.savedata.RichPresence;
         }
 
         public async Task<List<RepoItem>> FetchRepoPackagesAsync(string url)
@@ -653,6 +654,19 @@ namespace BVCC
             App.savedata.ShowUploadDetailsBar = checkBox.IsChecked == true;
             App.SaveToDisk();
             
+        }
+
+        private void RichPresenceCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.savedata == null) return;
+            CheckBox checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+            App.savedata.RichPresence = checkBox.IsChecked == true;
+            App.SaveToDisk();
+            if (!App.savedata.RichPresence)
+            {
+                RichPresence.Clear();
+            }
         }
     }
 }

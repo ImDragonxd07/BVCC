@@ -847,6 +847,27 @@
                                         FontSize="13"
                                         FontWeight="SemiBold"
                                         Foreground="White"
+                                        Text="Discord Rich Presence" />
+                                    <TextBlock
+                                        FontSize="10"
+                                        Foreground="#88FFFFFF"
+                                        Text="Enables rich presence information in Discord." />
+                                </StackPanel>
+                                <CheckBox
+                                    x:Name="RichPresenceCheckBox"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="RichPresenceCheckBox_Click"
+                                    IsChecked="True"
+                                    Style="{StaticResource ToggleSwitch}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="White"
                                         Text="Show Pre-release Packages" />
                                     <TextBlock
                                         FontSize="10"

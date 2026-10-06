@@ -14,6 +14,17 @@
           }
         }
       },
+      "DiscordRichPresence/1.6.1.70": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.3"
+        },
+        "runtime": {
+          "lib/net9.0/DiscordRPC.dll": {
+            "assemblyVersion": "1.6.1.70",
+            "fileVersion": "1.6.1.70"
+          }
+        }
+      },
       "JsonSubTypes/2.0.1": {
         "dependencies": {
           "Newtonsoft.Json": "13.0.3"
@@ -91,6 +102,13 @@
       "sha512": "sha512-VkP04/jFXaxT3TkcRhzETYtOrznQxRmQ2J1XJdbXz47Bir7hIzPR7mFZk4GJQ4An4gozW+vonpf+iqTHomAkQw==",
       "path": "credentialmanagement/1.0.2",
       "hashPath": "credentialmanagement.1.0.2.nupkg.sha512"
+    },
+    "DiscordRichPresence/1.6.1.70": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-yho1fdhbsedICHdfHe/Tu3IX6a5oj4fiPFL0keZStlsh7T/FrdjcwZZ7C1uC2HUvcXbFh+VEJvcbo1W66QtkUg==",
+      "path": "discordrichpresence/1.6.1.70",
+      "hashPath": "discordrichpresence.1.6.1.70.nupkg.sha512"
     },
     "JsonSubTypes/2.0.1": {
       "type": "package",

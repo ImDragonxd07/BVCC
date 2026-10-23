@@ -33,14 +33,31 @@ namespace BVCC
             public bool ShowPreReleases { get; set; } = true;
             public bool ShowUploadDetailsBar { get; set; } = true;
             public bool OpenUnityAfterProjectCreation { get; set; } = false;
+            public bool ShowBetaPackageVersions { get; set; } = true;
             public bool SwipeOnProjectClone { get; set; }  = true;
             public List<RepoItem> Repositories { get; set; } = new List<RepoItem>();
+            public List<UnityPackageItem> UnityPackages { get; set; } = new List<UnityPackageItem>();
             public List<ProjectItem> Projects { get; set; } = new List<ProjectItem>();
             public List<RepoTemplate> RepoTemplates { get; set; } = new List<RepoTemplate>();
             public List<ProjectBackup> ProjectBackups { get; set; } = new List<ProjectBackup>();
             public string ProjectsFolder { get; set; } = "";
             public string UnityEditorPath { get; set; } = "";
             public string RepoPath { get; set; }  = "";
+        }
+        public class UnityPackageItem
+        {
+            public string Name { get; set; }
+            public string Path { get; set; }
+            public string Author { get; } = "unitypackage";
+            public Dictionary<string, UnityImportRecord> Imports { get; set; }
+                = new Dictionary<string, UnityImportRecord>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public class UnityImportRecord
+        {
+            public DateTime ImportedAt { get; set; }
+            public List<string> Files { get; set; } = new List<string>();
+            public List<string> Folders { get; set; } = new List<string>();
         }
         public class RepoTemplate
         {

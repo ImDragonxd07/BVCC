@@ -49,7 +49,10 @@ namespace BVCC
         private void RefreshPage()
         {
             RepoListBox.ItemsSource = null;
-            RepoListBox.ItemsSource = App.savedata.Repositories;
+            RepoListBox.ItemsSource = App.savedata.Repositories
+                .Cast<object>()
+                .Concat(App.savedata.UnityPackages.Cast<object>())
+                .ToList();
             UnityEditorPathBox.Text = App.savedata.UnityEditorPath;
             ProjectPathBox.Text = App.savedata.ProjectsFolder;
             LocalRepoPathBox.Text = App.savedata.RepoPath;
@@ -193,14 +196,51 @@ namespace BVCC
         }
         private void RemoveRepo_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.DataContext is RepoItem item)
+            if (sender is Button btn)
             {
-                App.savedata.Repositories.Remove(item);
+                if (btn.DataContext is RepoItem item)
+                {
+                    App.savedata.Repositories.Remove(item);
+                }
+                else if (btn.DataContext is UnityPackageItem packageItem)
+                {
+                    App.savedata.UnityPackages.Remove(packageItem);
+                }
                 RefreshPage();
                 App.SaveToDisk();
             }
         }
+        private void AddPackage_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "Unity Package (*.unitypackage)|*.unitypackage",
+                Title = "Select Unity Package Files",
+                Multiselect = true
+            };
 
+            if (openFileDialog.ShowDialog() == true)
+            {
+                foreach (string filePath in openFileDialog.FileNames)
+                {
+                    App.savedata.UnityPackages.Add(new UnityPackageItem
+                    {
+                        Name = Path.GetFileNameWithoutExtension(filePath),
+                        Path = filePath
+                    });
+                }
+
+                App.ProjectsPage.RefreshProjects();
+                RefreshPage();
+                App.SaveToDisk();
+
+                CustomDialog.Show(
+                    $"{openFileDialog.FileNames.Length} Unity package(s) imported successfully!",
+                    App.savedata.AppName,
+                    CustomDialog.Mode.Message
+                );
+            }
+        }
         private void ImportVCC_Click(object sender, RoutedEventArgs e)
         {
             string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VRChatCreatorCompanion", "Settings.json");
@@ -376,13 +416,28 @@ namespace BVCC
 
         private void RepoSearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (RepoListBox == null) return;
+            if (RepoListBox == null || App.savedata == null)
+                return;
 
-            string query = RepoSearchBox.Text?.ToLower() ?? "";
+            string query = RepoSearchBox.Text?.Trim() ?? "";
 
-            RepoListBox.ItemsSource = App.savedata.Repositories
-                .Where(r => r.Name?.ToLower().Contains(query) == true
-                         || r.Url?.ToLower().Contains(query) == true)
+            var repositories = App.savedata.Repositories
+                .Where(r =>
+                    string.IsNullOrWhiteSpace(query) ||
+                    r.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+                    r.Url?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+                    r.Author?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
+                .Cast<object>();
+
+            var unityPackages = App.savedata.UnityPackages
+                .Where(p =>
+                    string.IsNullOrWhiteSpace(query) ||
+                    p.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+                    p.Path?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
+                .Cast<object>();
+
+            RepoListBox.ItemsSource = repositories
+                .Concat(unityPackages)
                 .ToList();
         }
 

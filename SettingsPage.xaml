@@ -407,6 +407,16 @@
                                     <Button
                                         Width="70"
                                         Height="24"
+                                        Margin="0,0,6,0"
+                                        Background="#FF333333"
+                                        Click="AddPackage_Click"
+                                        Content="ADD PACKAGE"
+                                        FontSize="9"
+                                        Style="{StaticResource PillButton}" />
+
+                                    <Button
+                                        Width="70"
+                                        Height="24"
                                         Background="#FF333333"
                                         Click="ExportRepo_Click"
                                         Content="EXPORT"

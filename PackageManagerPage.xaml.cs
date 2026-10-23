@@ -149,9 +149,377 @@ namespace BVCC
         private HashSet<string> _installing = new HashSet<string>();
         private readonly object _installingLock = new object();
 
+        // ───────────────────────── .unitypackage support ─────────────────────────
+        private const string UnityPkgPrefix = "unitypackage:";
+        private const string UnityPkgVersion = "local";
+
+        public static bool IsUnityPkg(ProjectPackage p) =>
+            p?.ID != null && p.ID.StartsWith(UnityPkgPrefix, StringComparison.Ordinal);
+
+        // Library packages (App.savedata.UnityPackages) as ProjectPackages, for pickers like new-project templates
+        public static List<ProjectPackage> GetLibraryUnityPackages()
+        {
+            return App.savedata.UnityPackages
+                .Where(u => !string.IsNullOrEmpty(u.Path) && File.Exists(u.Path))
+                .Select(u => MakeUnityPkg(u.Path, u.Name, false))
+                .ToList();
+        }
+        private static string UnityPkgSource(ProjectPackage p) => p.ID.Substring(UnityPkgPrefix.Length);
+
+        private static string ProjKey(string projectPath) =>
+            Path.GetFullPath(projectPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        private static UnityPackageItem FindUnityItem(ProjectPackage p) =>
+            App.savedata.UnityPackages.FirstOrDefault(u =>
+                string.Equals(u.Path, UnityPkgSource(p), StringComparison.OrdinalIgnoreCase));
+
+        // Only allow writes inside Assets/ or Packages/
+        private static string SafeDest(string projectRoot, string rel)
+        {
+            string full = Path.GetFullPath(Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar)));
+            string a = Path.Combine(projectRoot, "Assets") + Path.DirectorySeparatorChar;
+            string p = Path.Combine(projectRoot, "Packages") + Path.DirectorySeparatorChar;
+            return full.StartsWith(a, StringComparison.OrdinalIgnoreCase) ||
+                   full.StartsWith(p, StringComparison.OrdinalIgnoreCase) ? full : null;
+        }
+
+        private static ProjectPackage MakeUnityPkg(string source, string name, bool installed) => new ProjectPackage
+        {
+            ID = UnityPkgPrefix + source,
+            Name = string.IsNullOrEmpty(name) ? Path.GetFileNameWithoutExtension(source) : name,
+            IsInstalled = installed,
+            CurrentVersion = installed ? UnityPkgVersion : null,
+            LatestVersion = UnityPkgVersion,
+            SelectedVersion = UnityPkgVersion,
+            VersionList = new List<string> { UnityPkgVersion }
+        };
+
+        // Installed = the library item has an import recorded for this project; otherwise available
+        private static void LoadUnityPackages(string projectPath, List<ProjectPackage> installed, List<ProjectPackage> available)
+        {
+            string key = ProjKey(projectPath);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var up in App.savedata.UnityPackages.ToList())
+            {
+                if (string.IsNullOrEmpty(up.Path) || !seen.Add(up.Path)) continue;
+
+                bool isInstalled = up.Imports != null && up.Imports.ContainsKey(key);
+                if (isInstalled)
+                    installed.Add(MakeUnityPkg(up.Path, up.Name, true));
+                else if (File.Exists(up.Path))
+                    available.Add(MakeUnityPkg(up.Path, up.Name, false));
+            }
+        }
+
+        // ── minimal tar.gz reader (a .unitypackage is a gzipped tar) ──
+        private static int ReadFully(Stream s, byte[] buf, int count)
+        {
+            int total = 0, n;
+            while (total < count && (n = s.Read(buf, total, count - total)) > 0) total += n;
+            return total;
+        }
+        private static void SkipBytes(Stream s, long count)
+        {
+            var buf = new byte[81920];
+            while (count > 0)
+            {
+                int n = s.Read(buf, 0, (int)Math.Min(buf.Length, count));
+                if (n <= 0) break;
+                count -= n;
+            }
+        }
+        private static void CopyBytes(Stream src, Stream dst, long count)
+        {
+            var buf = new byte[81920];
+            while (count > 0)
+            {
+                int n = src.Read(buf, 0, (int)Math.Min(buf.Length, count));
+                if (n <= 0) throw new EndOfStreamException("Unexpected end of .unitypackage");
+                dst.Write(buf, 0, n);
+                count -= n;
+            }
+        }
+        private static string TarString(byte[] b, int off, int len)
+        {
+            int end = off, max = off + len;
+            while (end < max && b[end] != 0) end++;
+            return System.Text.Encoding.UTF8.GetString(b, off, end - off);
+        }
+        private static long TarSize(byte[] b)
+        {
+            if ((b[124] & 0x80) != 0)   // base-256 for huge files
+            {
+                long v = 0;
+                for (int i = 125; i < 136; i++) v = (v << 8) | b[i];
+                return v;
+            }
+            string s = TarString(b, 124, 12).Trim();
+            return s.Length == 0 ? 0 : Convert.ToInt64(s, 8);
+        }
+
+        // Extracts <guid>/asset, <guid>/asset.meta, <guid>/pathname into tempDir
+        private static void ExtractUnityPackage(string pkgPath, string tempDir)
+        {
+            using (var fs = File.OpenRead(pkgPath))
+            using (var gz = new GZipStream(fs, CompressionMode.Decompress))
+            {
+                var header = new byte[512];
+                string longName = null;
+
+                while (ReadFully(gz, header, 512) == 512)
+                {
+                    if (header[0] == 0) break;
+
+                    string name = TarString(header, 0, 100);
+                    long size = TarSize(header);
+                    char type = (char)header[156];
+                    long padding = (512 - size % 512) % 512;
+
+                    if (type == 'L')   // GNU long name
+                    {
+                        var nb = new byte[size];
+                        ReadFully(gz, nb, (int)size);
+                        longName = TarString(nb, 0, nb.Length);
+                        SkipBytes(gz, padding);
+                        continue;
+                    }
+                    if (type == 'x' || type == 'g')   // pax headers
+                    {
+                        SkipBytes(gz, size + padding);
+                        continue;
+                    }
+
+                    if (longName != null) { name = longName; longName = null; }
+                    else if (TarString(header, 257, 5) == "ustar")
+                    {
+                        string prefix = TarString(header, 345, 155);
+                        if (prefix.Length > 0) name = prefix + "/" + name;
+                    }
+
+                    var parts = name.Replace('\\', '/').TrimStart('.', '/').Split('/');
+                    bool isFile = type == '0' || type == '\0';
+
+                    if (isFile && parts.Length == 2 && parts[0].Length > 0 && parts[0].All(Uri.IsHexDigit) &&
+                        (parts[1] == "asset" || parts[1] == "asset.meta" || parts[1] == "pathname"))
+                    {
+                        string dir = Path.Combine(tempDir, parts[0]);
+                        Directory.CreateDirectory(dir);
+                        using (var o = File.Create(Path.Combine(dir, parts[1])))
+                            CopyBytes(gz, o, size);
+                    }
+                    else
+                    {
+                        SkipBytes(gz, size);
+                    }
+                    SkipBytes(gz, padding);
+                }
+            }
+        }
+
+        public async Task ImportUnityPackageAsync(ProjectPackage package)
+        {
+            if (package == null || currentproject == null) return;
+
+            string source = UnityPkgSource(package);
+            var item = FindUnityItem(package);
+            if (item == null)
+            {
+                CustomDialog.Show("This package is no longer in your library.", App.savedata.AppName, CustomDialog.Mode.Message);
+                return;
+            }
+            if (!File.Exists(source))
+            {
+                CustomDialog.Show("The .unitypackage file no longer exists on disk.", App.savedata.AppName, CustomDialog.Mode.Message);
+                return;
+            }
+
+            string root = Path.GetFullPath(currentproject.ProjectPath);
+            string assetsPath = Path.Combine(root, "Assets");
+            if (!Directory.Exists(assetsPath))
+            {
+                CustomDialog.Show("This project has no Assets folder.", App.savedata.AppName, CustomDialog.Mode.Message);
+                return;
+            }
+            if (!HasWriteAccess(assetsPath))
+            {
+                CustomDialog.Show("Permission Denied: Cannot write to the Assets folder.", App.savedata.AppName, CustomDialog.Mode.Message);
+                return;
+            }
+
+            lock (_installingLock)
+            {
+                if (_installing.Contains(package.ID)) return;
+                _installing.Add(package.ID);
+            }
+
+            await _installLock.WaitAsync();
+
+            string temp = Path.Combine(Path.GetTempPath(), "bvcc_upkg_" + Guid.NewGuid().ToString("N"));
+            string projKey = ProjKey(currentproject.ProjectPath);
+            var record = new UnityImportRecord { ImportedAt = DateTime.Now };
+
+            try
+            {
+                package.CurrentAction = PackageAction.Installing;
+                package.ProgressingControl = "Install";
+                package.InstallProgress = 0.05;
+
+                Directory.CreateDirectory(temp);
+
+                await Task.Run(() =>
+                {
+                    ExtractUnityPackage(source, temp);
+                    Dispatcher.BeginInvoke(new Action(() => package.InstallProgress = 0.5));
+
+                    var guidDirs = Directory.GetDirectories(temp);
+                    for (int i = 0; i < guidDirs.Length; i++)
+                    {
+                        string g = guidDirs[i];
+                        string pathnameFile = Path.Combine(g, "pathname");
+                        if (!File.Exists(pathnameFile)) continue;
+
+                        string rel = File.ReadLines(pathnameFile).FirstOrDefault()?.Trim().Replace('\\', '/');
+                        if (string.IsNullOrEmpty(rel)) continue;
+
+                        string dest = SafeDest(root, rel);
+                        if (dest == null) { Debug.WriteLine($"[UnityPackage] Skipped unsafe path: {rel}"); continue; }
+
+                        string assetFile = Path.Combine(g, "asset");
+                        string metaFile = Path.Combine(g, "asset.meta");
+                        bool existed = File.Exists(dest) || Directory.Exists(dest);
+
+                        if (File.Exists(assetFile))
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                            File.Copy(assetFile, dest, true);
+                            record.Files.Add(rel);
+                        }
+                        else
+                        {
+                            Directory.CreateDirectory(dest);
+                            record.Folders.Add(rel);
+                        }
+
+                        // Keep the project's existing GUID if the asset was already there
+                        if (File.Exists(metaFile) && !(existed && File.Exists(dest + ".meta")))
+                            File.Copy(metaFile, dest + ".meta", true);
+
+                        double prog = 0.5 + 0.45 * (i + 1) / guidDirs.Length;
+                        Dispatcher.BeginInvoke(new Action(() => package.InstallProgress = prog));
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                CustomDialog.Show($"Failed to import {package.Name}: {ex.Message}", App.savedata.AppName, CustomDialog.Mode.Message);
+            }
+            finally
+            {
+                // Save even a partial import so it can still be removed
+                if (record.Files.Count > 0 || record.Folders.Count > 0)
+                {
+                    if (item.Imports.TryGetValue(projKey, out var old))   // re-import: merge with the earlier record
+                    {
+                        record.Files = old.Files.Union(record.Files, StringComparer.OrdinalIgnoreCase).ToList();
+                        record.Folders = old.Folders.Union(record.Folders, StringComparer.OrdinalIgnoreCase).ToList();
+                    }
+                    item.Imports[projKey] = record;
+                    App.SaveToDisk();
+                }
+
+                _installLock.Release();
+                lock (_installingLock) _installing.Remove(package.ID);
+
+                package.ProgressingControl = null;
+                package.CurrentAction = PackageAction.None;
+                package.InstallProgress = 0;
+
+                try { await DeleteDirectorySafe(temp); } catch { }
+            }
+
+            currentproject.LastModified = DateTime.Now;
+            App.SaveToDisk();
+            App.ProjectsPage.RefreshProjects();
+            if (!_isBulkOperation) await LoadProject(currentproject);
+        }
+
+        private async Task RemoveUnityPackageFilesAsync(ProjectPackage p)
+        {
+            string root = Path.GetFullPath(currentproject.ProjectPath);
+            string projKey = ProjKey(currentproject.ProjectPath);
+            var item = FindUnityItem(p);
+
+            if (item == null || !item.Imports.TryGetValue(projKey, out var record))
+            {
+                CustomDialog.Show("No import record found for this package in this project.", App.savedata.AppName, CustomDialog.Mode.Message);
+                return;
+            }
+
+            var failed = new List<string>();
+            p.InstallProgress = 0.3;
+
+            await Task.Run(() =>
+            {
+                foreach (var rel in record.Files)
+                {
+                    string full = SafeDest(root, rel);
+                    if (full == null) continue;
+                    try
+                    {
+                        if (File.Exists(full)) { File.SetAttributes(full, FileAttributes.Normal); File.Delete(full); }
+                        if (File.Exists(full + ".meta")) File.Delete(full + ".meta");
+                    }
+                    catch { failed.Add(rel); }
+                }
+
+                // folders: only if empty, deepest first
+                foreach (var rel in record.Folders.OrderByDescending(f => f.Length))
+                {
+                    string full = SafeDest(root, rel);
+                    if (full == null || !Directory.Exists(full)) continue;
+                    try
+                    {
+                        if (!Directory.EnumerateFileSystemEntries(full).Any())
+                        {
+                            Directory.Delete(full);
+                            if (File.Exists(full + ".meta")) File.Delete(full + ".meta");
+                        }
+                    }
+                    catch { }
+                }
+            });
+
+            p.InstallProgress = 0.8;
+
+            if (failed.Count == 0)
+            {
+                item.Imports.Remove(projKey);
+            }
+            else
+            {
+                // keep the record for whatever is left so removal can be retried
+                record.Files = failed;
+                record.Folders.Clear();
+                CustomDialog.Show($"{failed.Count} files could not be deleted (is Unity open?). Close Unity and try again.",
+                    App.savedata.AppName, CustomDialog.Mode.Message);
+            }
+            App.SaveToDisk();
+
+            p.InstallProgress = 1.0;
+            await Task.Delay(200);
+        }
+        // ─────────────────────── end .unitypackage support ───────────────────────
+
+
         public async Task InstallOrUpdatePackage(ProjectPackage package, string version, bool force = false)
         {
             if (package == null) return;
+            if (IsUnityPkg(package))
+            {
+                await ImportUnityPackageAsync(package);
+                return;
+            }
             if (string.IsNullOrEmpty(version)) return;
             currentproject.LastModified = DateTime.Now;
             App.SaveToDisk();
@@ -163,7 +531,7 @@ namespace BVCC
             if (drive.AvailableFreeSpace < minSpace)
             {
 
-                if((bool)!CustomDialog.Show("Low Disk Space, Installing now could lead to a corrupted manifest file, continue?", App.savedata.AppName, CustomDialog.Mode.Question))
+                if ((bool)!CustomDialog.Show("Low Disk Space, Installing now could lead to a corrupted manifest file, continue?", App.savedata.AppName, CustomDialog.Mode.Question))
                 {
                     return;
                 }
@@ -346,7 +714,7 @@ namespace BVCC
             {
                 await InstallOrUpdatePackage(dep.pkg, dep.ver, force: true);
             }
-            
+
         }
         private async Task UpdateManifest(string id, string version, bool isRemoval = false)
         {
@@ -428,6 +796,12 @@ namespace BVCC
         public async Task InstallLatestVersion(ProjectPackage package, bool force = false)
         {
             if (package == null) return;
+
+            if (IsUnityPkg(package))
+            {
+                await ImportUnityPackageAsync(package);
+                return;
+            }
 
             string latest = null;
 
@@ -606,7 +980,12 @@ namespace BVCC
                     foreach (var p in packageLookup.Values)
                         if (!finalDisplayList.Contains(p)) finalDisplayList.Add(p);
 
-                    finalDisplayList.AddRange(availableList.OrderBy(p => p.Name));
+                    var upInstalled = new List<ProjectPackage>();
+                    var upAvailable = new List<ProjectPackage>();
+                    LoadUnityPackages(project.ProjectPath, upInstalled, upAvailable);
+
+                    finalDisplayList.AddRange(upInstalled);
+                    finalDisplayList.AddRange(availableList.Concat(upAvailable).OrderBy(p => p.Name));
 
                     string uVer = "Unknown";
                     try
@@ -816,9 +1195,10 @@ namespace BVCC
             }
             else if (_activeSortField == "Version")
             {
+                string VerKey(ProjectPackage p) => IsUnityPkg(p) ? "0.0" : (p.CurrentVersion ?? "0.0");
                 filtered = _sortAscending
-                    ? filtered.OrderBy(p => UnityHelper.ParseVersion(p.CurrentVersion ?? "0.0"))
-                    : filtered.OrderByDescending(p => UnityHelper.ParseVersion(p.CurrentVersion ?? "0.0"));
+                    ? filtered.OrderBy(p => UnityHelper.ParseVersion(VerKey(p)))
+                    : filtered.OrderByDescending(p => UnityHelper.ParseVersion(VerKey(p)));
             }
             else
             {
@@ -928,6 +1308,12 @@ namespace BVCC
 
                 try
                 {
+                    if (IsUnityPkg(p))
+                    {
+                        await RemoveUnityPackageFilesAsync(p);
+                        await LoadProject(currentproject);
+                        return;
+                    }
                     string path = Path.Combine(currentproject.ProjectPath, "Packages", p.ID);
                     p.InstallProgress = 0.4;
                     if (Directory.Exists(path))
@@ -1011,7 +1397,7 @@ namespace BVCC
 
         private async void UpdateAll_Click(object sender, RoutedEventArgs e)
         {
-            
+
             var targets = allPackages
                 .Where(p => p.IsInstalled && p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion) && p.Status != CompatibilityStatus.Incompatible)
                 .Select(p => (p, p.LatestVersion))
@@ -1022,7 +1408,7 @@ namespace BVCC
         private async void ReinstallAll_Click(object sender, RoutedEventArgs e)
         {
             var targets = allPackages
-                .Where(p => p.IsInstalled && !string.IsNullOrEmpty(p.CurrentVersion) && p.Status != CompatibilityStatus.Incompatible)
+                .Where(p => p.IsInstalled && !IsUnityPkg(p) && !string.IsNullOrEmpty(p.CurrentVersion) && p.Status != CompatibilityStatus.Incompatible)
                 .Select(p => (p, p.CurrentVersion))
                 .ToList();
             await RunBulkOperation(targets, (p, v) => InstallOrUpdatePackage(p, v, force: true), "REINSTALLING");
@@ -1032,6 +1418,7 @@ namespace BVCC
         {
             if (sender is ComboBox cb && cb.DataContext is ProjectPackage p)
             {
+                if (IsUnityPkg(p)) return;   // a unitypackage only has one "version"
                 string ver = cb.SelectedItem as string;
                 if (!string.IsNullOrEmpty(ver) && ver != p.CurrentVersion)
                 {
@@ -1065,7 +1452,7 @@ namespace BVCC
             var filtered = versions.Where(v => !string.IsNullOrEmpty(v));
 
             if (!includePreRelease)
-                filtered = filtered.Where(v => !IsPreRelease(v));
+                filtered = filtered.Where(v => !v.Contains("beta", StringComparison.OrdinalIgnoreCase));
 
             return filtered
                 .OrderBy(v => ascending ? UnityHelper.ParseVersion(v) : new Version(0, 0))
@@ -1092,7 +1479,7 @@ namespace BVCC
         private void BackupsBtn_Click(object sender, RoutedEventArgs e)
         {
             ProjectBackupPage bakckuppdage = new ProjectBackupPage(currentproject);
-            UIHelper.SwipePage(bakckuppdage,false);
+            UIHelper.SwipePage(bakckuppdage, false);
         }
 
         private void MoreBtn_Click(object sender, RoutedEventArgs e)
@@ -1146,7 +1533,7 @@ namespace BVCC
             if (!confirm) return;
 
             string path = currentproject.ProjectPath;
-            if(Directory.Exists(path))
+            if (Directory.Exists(path))
             {
                 try
                 {

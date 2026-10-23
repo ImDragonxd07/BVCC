@@ -68,7 +68,7 @@ namespace BVCC
                 if (_selectedPackageIds.Contains(item.ID))
                     RepoList.SelectedItems.Add(item);
             }
-            if(_selectedPackageIds.Count > 0)
+            if (_selectedPackageIds.Count > 0)
             {
                 BulkActionBar.Visibility = Visibility.Visible;
                 SelectedCountText.Text = $"{_selectedPackageIds.Count} selected";
@@ -88,7 +88,10 @@ namespace BVCC
 
             await App.EnsureRepoCacheAsync();
 
-            _availablePackages = App.CachedPackages;
+            // Copy the repo cache and add local .unitypackage library items to the copy
+            // (don't add to App.CachedPackages itself, or they'd leak into the shared cache)
+            _availablePackages = new List<ProjectPackage>(App.CachedPackages ?? new List<ProjectPackage>());
+            _availablePackages.AddRange(PackageManagerPage.GetLibraryUnityPackages());
             _filteredPackages = _availablePackages;
 
             RepoGhostLoading.Visibility = Visibility.Collapsed;
@@ -109,6 +112,8 @@ namespace BVCC
 
         public async Task SetTemplate(TemplateItem template)
         {
+            if (template == null) return;
+
             _template = template;
             CreateBtn.Visibility = Visibility.Collapsed;
 
@@ -140,7 +145,7 @@ namespace BVCC
 
             if (defaultTemplate != null)
             {
-                SelectTemplate(defaultTemplate);
+                await SelectTemplate(defaultTemplate);
                 TemplateSelector.SelectedItem = defaultTemplate;
             }
             CreateBtn.Visibility = Visibility.Visible;
@@ -160,7 +165,7 @@ namespace BVCC
             string name = TemplateNameBox.Text.Trim();
 
             RepoTemplate newtemplate = App.savedata.RepoTemplates
-                .FirstOrDefault(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(t => t.Name != null && t.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
             if (newtemplate == null)
             {
@@ -206,7 +211,7 @@ namespace BVCC
             _filteredPackages = string.IsNullOrEmpty(query)
                 ? _availablePackages
                 : _availablePackages
-                    .Where(p => p.Name.ToLower().Contains(query) || p.ID.ToLower().Contains(query))
+                    .Where(p => (p.Name ?? "").ToLower().Contains(query) || (p.ID ?? "").ToLower().Contains(query))
                     .ToList();
 
             RefreshRepoList();
@@ -246,24 +251,24 @@ namespace BVCC
             if (_loadTask != null)
                 await _loadTask;
 
-            _selectedPackageIds = new HashSet<string>(template.PackageIDs);
+            var ids = template.PackageIDs ?? new List<string>();
             TemplateNameBox.Text = template.Name;
 
             var validIds = _availablePackages.Select(p => p.ID).ToHashSet();
 
-            var missing = template.PackageIDs
+            var missing = ids
                 .Where(id => !validIds.Contains(id))
                 .ToList();
 
             _selectedPackageIds = new HashSet<string>(
-                template.PackageIDs.Where(id => validIds.Contains(id)));
+                ids.Where(id => validIds.Contains(id)));
 
             RefreshRepoList();
 
             if (missing.Count > 0)
             {
                 CustomDialog.Show(
-                    $"{missing.Count} packages in {template.Name} are missing from repositories and will be ignored.",
+                    $"{missing.Count} packages in {template.Name} are missing and will be ignored.",
                     "Warning",
                     CustomDialog.Mode.Message);
             }
@@ -277,7 +282,7 @@ namespace BVCC
         {
             var template = TemplateSelector.SelectedItem as RepoTemplate;
             if (template == null) return;
-            
+
             App.savedata.RepoTemplates.Remove(template);
             refreshselector();
             TemplateSelector.SelectedIndex = 0;
@@ -346,11 +351,9 @@ namespace BVCC
 
                 CreateProgress = 0;
 
+                string source = _template?.TemplatePath;
 
-
-                string source = _template.TemplatePath;
-
-                if (!Directory.Exists(source))
+                if (string.IsNullOrEmpty(source) || !Directory.Exists(source))
                 {
                     Log("Template missing: " + source);
                     CustomDialog.Show("Template not found.", App.savedata.AppName, CustomDialog.Mode.Message);
@@ -388,14 +391,23 @@ namespace BVCC
                 Log("Importing project into manager");
 
                 var project = App.ProjectsPage.ImportProjectFromFile(destination);
+                if (project == null)
+                {
+                    Log("ImportProjectFromFile returned null");
+                    CustomDialog.Show("Failed to import the new project.", App.savedata.AppName, CustomDialog.Mode.Message);
+                    return;
+                }
+
                 PackageManagerPage packageManager = new PackageManagerPage();
                 await packageManager.LoadProject(project);
 
                 Log("Project loaded into PackageManager");
 
+                // VPM packages first, local .unitypackages last (assets may depend on VPM packages)
                 var packages = _availablePackages
-                                            .Where(p => _selectedPackageIds.Contains(p.ID))
-                                            .ToList();
+                    .Where(p => _selectedPackageIds.Contains(p.ID))
+                    .OrderBy(p => PackageManagerPage.IsUnityPkg(p))
+                    .ToList();
 
                 int total = packages.Count;
                 int done = 0;

@@ -23,7 +23,7 @@
 ## ✨ Features
 * **Seamless Migration:** Import all your projects directly from the official VCC.
 * **Streamlined UI:** Clean, modern interface designed for speed.
-* **Package Management:** Easy handling of VPM repositories and dependencies.
+* **Package Management:** Easy handling of VPM repositories and dependencies. Also allows using unitypackages in the package manager.
 * **Lightweight:** Optimized to use fewer resources than the standard companion.
 
 ## 📸 Screenshots

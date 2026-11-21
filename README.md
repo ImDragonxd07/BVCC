@@ -22,9 +22,12 @@
 
 ## ✨ Features
 * **Seamless Migration:** Import all your projects directly from the official VCC.
+* **Project Backups:** Create and restore project backups to protect your work.
+* **Project Presets:** Save package configurations as presets and quickly apply them when creating new projects.
 * **Streamlined UI:** Clean, modern interface designed for speed.
-* **Package Management:** Easy handling of VPM repositories and dependencies. Also allows using unitypackages in the package manager.
-* **Lightweight:** Optimized to use fewer resources than the standard companion.
+* **Package Management:** Easy handling of VPM repositories and dependencies, with support for updating all packages simultaneously and installing multiple packages at once.
+* **UnityPackage Support:** Install `.unitypackage` files directly through the package manager without manually importing them through Unity.
+* **Avatar Information:** View avatar names, supported platforms, platform-specific statistics, and last upload dates.
 
 ## 📸 Screenshots
 
